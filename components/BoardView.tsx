@@ -46,6 +46,7 @@ export default function BoardView({
   const [query, setQuery] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState<FilterAssignee>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<FilterDifficulty>("all");
+  const isIdeaList = workflow === "feature_ideas";
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -86,7 +87,7 @@ export default function BoardView({
             <h1 className="text-2xl font-bold tracking-tight text-ink-900">{title}</h1>
             <p className="text-sm text-ink-400">
               {tasks.length} {workflow === "feature_ideas" ? "idea" : "task"}
-              {tasks.length === 1 ? "" : "s"} across this workflow
+              {tasks.length === 1 ? "" : "s"} {isIdeaList ? "in the list" : "across this workflow"}
             </p>
           </div>
         </div>
@@ -97,42 +98,55 @@ export default function BoardView({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tasks"
+              placeholder={isIdeaList ? "Search ideas" : "Search tasks"}
               className="input w-72 pl-9"
             />
           </div>
 
-          <select
-            value={assigneeFilter}
-            onChange={(e) => setAssigneeFilter(e.target.value as FilterAssignee)}
-            className="input w-auto"
-          >
-            <option value="all">All people</option>
-            <option value="unassigned">Unassigned</option>
-            {team.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name ?? p.email}
-              </option>
-            ))}
-          </select>
+          {!isIdeaList && (
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value as FilterAssignee)}
+              className="input w-auto"
+            >
+              <option value="all">All people</option>
+              <option value="unassigned">Unassigned</option>
+              {team.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name ?? p.email}
+                </option>
+              ))}
+            </select>
+          )}
 
-          <select
-            value={difficultyFilter}
-            onChange={(e) => setDifficultyFilter(e.target.value as FilterDifficulty)}
-            className="input w-auto"
-          >
-            <option value="all">All difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-            <option value="epic">Epic</option>
-          </select>
+          {!isIdeaList && (
+            <select
+              value={difficultyFilter}
+              onChange={(e) => setDifficultyFilter(e.target.value as FilterDifficulty)}
+              className="input w-auto"
+            >
+              <option value="all">All difficulty</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+              <option value="epic">Epic</option>
+            </select>
+          )}
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="mx-auto max-w-[1400px] space-y-8">
-          {groups.map((group) => (
+          {isIdeaList ? (
+            <TaskTable
+              tasks={filtered}
+              team={team}
+              me={me}
+              workflow={workflow}
+              defaultStatus="backlog"
+              emptyHint="No ideas yet."
+            />
+          ) : groups.map((group) => (
             <section key={group.status}>
               <div className="mb-2 flex items-center gap-3">
                 <StatusGroupBadge status={group.status} count={group.tasks.length} />
@@ -143,7 +157,7 @@ export default function BoardView({
                 me={me}
                 workflow={workflow}
                 defaultStatus={group.status}
-                emptyHint={`No ${workflow === "feature_ideas" ? "ideas" : "tasks"} in ${group.label.toLowerCase()}.`}
+                emptyHint={`No tasks in ${group.label.toLowerCase()}.`}
               />
             </section>
           ))}

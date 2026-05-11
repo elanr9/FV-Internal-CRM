@@ -40,7 +40,8 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
   const [open, setOpen] = useState<TaskWithPeople | null>(null);
   const [creating, setCreating] = useState(false);
   const canAdd = Boolean(me && workflow);
-  const columnCount = showWorkflow ? 9 : 8;
+  const isIdeaList = workflow === "feature_ideas" && !showWorkflow;
+  const columnCount = isIdeaList ? 5 : showWorkflow ? 9 : 8;
 
   return (
     <>
@@ -49,16 +50,17 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
           <thead>
             <tr className="bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
               <th className="w-1 border-b border-ink-100 px-4 py-3" />
-              <th className="border-b border-ink-100 px-4 py-3 text-left">Task</th>
-              {showWorkflow && (
+              <th className="border-b border-ink-100 px-4 py-3 text-left">{isIdeaList ? "Idea" : "Task"}</th>
+              {!isIdeaList && showWorkflow && (
                 <th className="border-b border-ink-100 px-4 py-3 text-left">Workflow</th>
               )}
-              <th className="border-b border-ink-100 px-4 py-3 text-left">Status</th>
+              {!isIdeaList && <th className="border-b border-ink-100 px-4 py-3 text-left">Status</th>}
               <th className="border-b border-ink-100 px-4 py-3 text-left">Given by</th>
-              <th className="border-b border-ink-100 px-4 py-3 text-left">Assignees</th>
-              <th className="border-b border-ink-100 px-4 py-3 text-left">Difficulty</th>
-              <th className="border-b border-ink-100 px-4 py-3 text-left">Due</th>
+              {!isIdeaList && <th className="border-b border-ink-100 px-4 py-3 text-left">Assignees</th>}
+              {!isIdeaList && <th className="border-b border-ink-100 px-4 py-3 text-left">Difficulty</th>}
+              {!isIdeaList && <th className="border-b border-ink-100 px-4 py-3 text-left">Due</th>}
               <th className="border-b border-ink-100 px-4 py-3 text-left">Created</th>
+              {isIdeaList && <th className="border-b border-ink-100 px-4 py-3 text-left">Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -75,6 +77,7 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
                 task={task}
                 me={me}
                 showWorkflow={showWorkflow}
+                ideaList={isIdeaList}
                 onOpen={() => setOpen(task)}
               />
             ))}
@@ -124,17 +127,19 @@ function TaskRow({
   task,
   me,
   showWorkflow,
+  ideaList,
   onOpen
 }: {
   task: TaskWithPeople;
   me: Profile | null;
   showWorkflow?: boolean;
+  ideaList?: boolean;
   onOpen: () => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  async function patch(fields: Partial<TaskWithPeople>) {
+  async function patch(fields: Partial<TaskWithPeople>, successMessage?: string) {
     setBusy(true);
     const supabase = getSupabaseBrowser();
     const { error } = await supabase.from("tasks").update(fields).eq("id", task.id);
@@ -143,7 +148,22 @@ function TaskRow({
       toast.error(error.message);
       return;
     }
+    if (successMessage) toast.success(successMessage);
     router.refresh();
+  }
+
+  function addToEngineeringBacklog() {
+    patch(
+      {
+        workflow: "engineering",
+        status: "backlog",
+        assigned_to: null,
+        assignee_ids: [],
+        assignee_statuses: {},
+        due_date: null
+      },
+      "Idea added to engineering backlog"
+    );
   }
 
   function assigneeStatus(profileId: string): Status {
@@ -162,6 +182,52 @@ function TaskRow({
   const due = task.due_date ? parseISO(task.due_date) : null;
   const hasAttachments = task.images.length > 0;
   const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
+
+  if (ideaList) {
+    return (
+      <tr
+        className={clsx(
+          "group border-b border-ink-100 transition hover:bg-brand-50/40",
+          busy && "opacity-60"
+        )}
+      >
+        <td className="px-1" />
+        <td className="max-w-[640px] px-4 py-3">
+          <button onClick={onOpen} className="flex w-full items-center gap-2.5 text-left">
+            <span className="font-medium text-ink-900 group-hover:text-brand-700">
+              {task.title}
+            </span>
+            <span className="flex items-center gap-1.5 text-ink-400">
+              {hasAttachments && (
+                <span className="inline-flex items-center gap-0.5 text-xs">
+                  <Paperclip className="h-3 w-3" />
+                  {task.images.length}
+                </span>
+              )}
+            </span>
+          </button>
+          {task.description && (
+            <div className="mt-0.5 line-clamp-1 text-xs text-ink-400">{task.description}</div>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <AssignorDisplay task={task} />
+        </td>
+        <td className="px-4 py-3 text-xs text-ink-400">
+          {format(parseISO(task.created_at), "MMM d")}
+        </td>
+        <td className="px-4 py-3">
+          <button
+            onClick={addToEngineeringBacklog}
+            disabled={busy}
+            className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Add to engineering backlog
+          </button>
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <tr

@@ -52,10 +52,20 @@ export default function ProfileEditor({ me }: { me: Profile }) {
       return;
     }
     const { data } = supabase.storage.from("task-attachments").getPublicUrl(path);
+    const { error: saveErr } = await supabase
+      .from("profiles")
+      .update({ avatar_url: data.publicUrl })
+      .eq("id", me.id);
+    if (saveErr) {
+      setUploading(false);
+      toast.error(`Save failed: ${saveErr.message}`);
+      return;
+    }
     setAvatarUrl(data.publicUrl);
     setPickedSrc(null);
     setUploading(false);
-    toast.success("Photo ready, hit Save to apply.");
+    toast.success("Photo updated");
+    router.refresh();
   }
 
   async function save() {

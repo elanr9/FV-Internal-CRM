@@ -20,6 +20,7 @@ export type Task = {
   status: Status;
   difficulty: Difficulty;
   due_date: string | null;
+  call_url: string | null;
   position: number;
   created_by: string;
   assigned_to: string | null;

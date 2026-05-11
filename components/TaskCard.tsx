@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { format, isPast, isToday, parseISO } from "date-fns";
-import { Calendar, Paperclip } from "lucide-react";
+import { Calendar, Paperclip, Video } from "lucide-react";
 import type { Status, TaskWithPeople, Workflow } from "@/lib/types";
 import Avatar from "./Avatar";
 
@@ -97,6 +97,12 @@ export default function TaskCard({
           <span className="inline-flex items-center gap-1 text-ink-400">
             <Paperclip className="h-3 w-3" />
             {task.images.length}
+          </span>
+        )}
+        {task.call_url && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700">
+            <Video className="h-3 w-3" />
+            Call
           </span>
         )}
         {task.is_bug && (

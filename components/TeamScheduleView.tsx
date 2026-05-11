@@ -64,7 +64,18 @@ const MAX_DATE = `${DATE_YEAR}-12-31`;
 const TEAM_SCHEDULES: PersonSchedule[] = [
   { email: "elan@fieldvisionai.com", name: "Elan", blocks: [] },
   { email: "gabe@fieldvisionai.com", name: "Gabe", blocks: [] },
-  { email: "tona@fieldvisionai.com", name: "Tona", location: "Barcelona", blocks: [] },
+  {
+    email: "tona@fieldvisionai.com",
+    name: "Tona",
+    location: "Barcelona",
+    blocks: DAYS.map((day) => ({
+      id: `tona_unavailable_${day.key}`,
+      day: day.key,
+      start: 15 * 60,
+      end: 22 * 60,
+      label: "Not available"
+    }))
+  },
   {
     email: "lucho@fieldvisionai.com",
     name: "Lucho",

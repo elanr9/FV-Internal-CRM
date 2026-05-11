@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { addDays, format, isToday, parseISO } from "date-fns";
-import { Calendar as CalIcon, Inbox, Plus } from "lucide-react";
+import { Calendar as CalIcon, Inbox, Plus, Video } from "lucide-react";
 import type { DailyNote, Profile, TaskWithPeople } from "@/lib/types";
 import DailyNotes from "./DailyNotes";
 import TaskCard from "./TaskCard";
@@ -183,6 +183,7 @@ export default function WeekView({ me, team, tasks, notes, weekStart }: Props) {
                               <span className="line-clamp-1 text-xs font-medium text-ink-900">
                                 {t.title}
                               </span>
+                              {t.call_url && <Video className="h-3 w-3 shrink-0 text-brand-600" />}
                             </div>
                           </button>
                         ))

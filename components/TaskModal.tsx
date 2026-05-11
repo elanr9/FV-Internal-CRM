@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
-import { X, Trash2, Upload, Loader2, Send, Image as ImageIcon } from "lucide-react";
+import { X, Trash2, Upload, Loader2, Send, Image as ImageIcon, ExternalLink } from "lucide-react";
 import {
   DIFFICULTIES,
   DIFFICULTY_LABEL,
@@ -67,6 +67,7 @@ export default function TaskModal(props: Props) {
   const [status, setStatus] = useState<Status>(initial?.status ?? props.defaultStatus ?? "todo");
   const [difficulty, setDifficulty] = useState<Difficulty>(initial?.difficulty ?? "medium");
   const [dueDate, setDueDate] = useState<string>(dateInCurrentYear(initial?.due_date ?? props.defaultDueDate ?? ""));
+  const [callUrl, setCallUrl] = useState(initial?.call_url ?? "");
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
     initial
       ? (initial.assignee_ids ?? []).length > 0
@@ -74,7 +75,9 @@ export default function TaskModal(props: Props) {
         : initial.assigned_to
           ? [initial.assigned_to]
           : []
-      : [props.defaultAssignedTo ?? props.me.id].filter(Boolean)
+      : props.defaultWorkflow === "feature_ideas"
+        ? []
+        : [props.defaultAssignedTo ?? props.me.id].filter(Boolean)
   );
   const [assigneeStatuses, setAssigneeStatuses] = useState<AssigneeStatuses>(
     initial?.assignee_statuses ?? {}
@@ -137,6 +140,7 @@ export default function TaskModal(props: Props) {
       status,
       difficulty,
       due_date: dueDate || null,
+      call_url: normalizeCallUrl(callUrl),
       assigned_to: assigneeIds[0] ?? null,
       assignee_ids: assigneeIds,
       assignee_statuses: nextAssigneeStatuses,
@@ -278,6 +282,28 @@ export default function TaskModal(props: Props) {
               rows={5}
               className="input min-h-[120px] resize-y"
             />
+
+            <div>
+              <SectionLabel>Call link</SectionLabel>
+              <input
+                type="url"
+                value={callUrl}
+                onChange={(e) => setCallUrl(e.target.value)}
+                placeholder="Google Calendar or Zoom link"
+                className="input"
+              />
+              {normalizeCallUrl(callUrl) && (
+                <a
+                  href={normalizeCallUrl(callUrl) ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Open call link
+                </a>
+              )}
+            </div>
 
             <div>
               <SectionLabel>Attachments</SectionLabel>
@@ -553,4 +579,11 @@ function dateInCurrentYear(value: string) {
   const [, month, day] = value.split("-");
   if (!month || !day) return value;
   return `${DATE_YEAR}-${month}-${day}`;
+}
+
+function normalizeCallUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
 }

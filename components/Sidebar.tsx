@@ -72,6 +72,10 @@ export default function Sidebar({ me, team }: Props) {
             accent="text-fuchsia-600"
             active={pathname?.startsWith("/board/content") ?? false}
           />
+        </ul>
+
+        <SectionLabel className="mt-6">Ideas</SectionLabel>
+        <ul className="space-y-0.5">
           <SidebarLink
             href="/board/feature_ideas"
             label="Feature Ideas"
