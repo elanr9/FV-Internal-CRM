@@ -34,7 +34,7 @@ type Props = {
 
 export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "todo", emptyHint, showWorkflow }: Props) {
   const [open, setOpen] = useState<TaskWithPeople | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [creating, setCreating] = useState(false);
   const canAdd = Boolean(me && workflow);
   const columnCount = showWorkflow ? 8 : 7;
 
@@ -50,14 +50,14 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
                 <th className="border-b border-ink-100 px-4 py-3 text-left">Workflow</th>
               )}
               <th className="border-b border-ink-100 px-4 py-3 text-left">Status</th>
-              <th className="border-b border-ink-100 px-4 py-3 text-left">Owner</th>
+              <th className="border-b border-ink-100 px-4 py-3 text-left">Assignees</th>
               <th className="border-b border-ink-100 px-4 py-3 text-left">Difficulty</th>
               <th className="border-b border-ink-100 px-4 py-3 text-left">Due</th>
               <th className="border-b border-ink-100 px-4 py-3 text-left">Created</th>
             </tr>
           </thead>
           <tbody>
-            {tasks.length === 0 && !adding && (
+            {tasks.length === 0 && (
               <tr>
                 <td colSpan={columnCount} className="px-4 py-8 text-center text-sm text-ink-400">
                   {emptyHint ?? "No tasks yet."}
@@ -68,28 +68,16 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
               <TaskRow
                 key={task.id}
                 task={task}
-                team={team}
                 showWorkflow={showWorkflow}
                 onOpen={() => setOpen(task)}
               />
             ))}
-            {adding && me && workflow && (
-              <NewTaskRow
-                team={team}
-                me={me}
-                workflow={workflow}
-                defaultStatus={defaultStatus}
-                showWorkflow={showWorkflow}
-                onCancel={() => setAdding(false)}
-                onCreated={() => setAdding(false)}
-              />
-            )}
-            {canAdd && !adding && (
+            {canAdd && (
               <tr>
                 <td className="px-1" />
                 <td colSpan={columnCount - 1} className="px-4 py-2">
                   <button
-                    onClick={() => setAdding(true)}
+                    onClick={() => setCreating(true)}
                     className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-ink-400 transition hover:bg-ink-50 hover:text-brand-700"
                   >
                     <Plus className="h-4 w-4" />
@@ -111,18 +99,27 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
           onClose={() => setOpen(null)}
         />
       )}
+
+      {creating && me && workflow && (
+        <TaskModal
+          mode="create"
+          team={team}
+          me={me}
+          defaultWorkflow={workflow}
+          defaultStatus={defaultStatus}
+          onClose={() => setCreating(false)}
+        />
+      )}
     </>
   );
 }
 
 function TaskRow({
   task,
-  team,
   showWorkflow,
   onOpen
 }: {
   task: TaskWithPeople;
-  team: Profile[];
   showWorkflow?: boolean;
   onOpen: () => void;
 }) {
@@ -184,11 +181,7 @@ function TaskRow({
         />
       </td>
       <td className="px-4 py-3">
-        <AssigneeSelect
-          value={task.assigned_to}
-          team={team}
-          onChange={(assigned_to) => patch({ assigned_to })}
-        />
+        <AssigneesDisplay task={task} onClick={onOpen} />
       </td>
       <td className="px-4 py-3">
         <DifficultySelect
@@ -254,6 +247,7 @@ function NewTaskRow({
       difficulty,
       due_date: dueDate,
       assigned_to: assignedTo,
+      assignee_ids: assignedTo ? [assignedTo] : [],
       images: [],
       created_by: me.id
     });
@@ -447,6 +441,39 @@ function AssigneeSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+function AssigneesDisplay({ task, onClick }: { task: TaskWithPeople; onClick: () => void }) {
+  const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
+  const firstName = assignees[0]?.full_name ?? assignees[0]?.email.split("@")[0];
+  const label = assignees.length > 1 ? `${firstName} +${assignees.length - 1}` : firstName;
+  if (assignees.length === 0) {
+    return (
+      <button onClick={onClick} className="text-xs font-semibold text-ink-400 hover:text-brand-700">
+        No assignee
+      </button>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className="flex items-center gap-1.5 text-left">
+      <span className="flex -space-x-1">
+        {assignees.slice(0, 3).map((p) => (
+          <span key={p.id} className="rounded-full ring-2 ring-white">
+            <Avatar profile={p} size={26} />
+          </span>
+        ))}
+      </span>
+      <span className="max-w-32 truncate text-xs font-semibold text-ink-700">
+        {label}
+      </span>
+      {assignees.length > 3 && (
+        <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-bold text-ink-500">
+          +{assignees.length - 3}
+        </span>
+      )}
+    </button>
   );
 }
 

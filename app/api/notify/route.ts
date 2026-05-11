@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const { data: taskRow, error: taskErr } = await supabase
     .from("tasks")
-    .select("id, title, description, workflow, assigned_to, created_by")
+    .select("id, title, description, workflow, assigned_to, assignee_ids, created_by")
     .eq("id", body.taskId)
     .maybeSingle();
   if (taskErr || !taskRow) {
@@ -89,9 +89,7 @@ export async function POST(req: NextRequest) {
   } else if (body.kind === "task_created") {
     const mentioned = findMentions(taskRow.description ?? "", team);
     mentioned.forEach(add);
-    if (taskRow.assigned_to && taskRow.assigned_to !== user.id) {
-      add(team.find((p) => p.id === taskRow.assigned_to));
-    }
+    getAssigneeIds(taskRow.assignee_ids, taskRow.assigned_to).forEach((id) => add(team.find((p) => p.id === id)));
     subject = `${meName} created a task: ${taskRow.title}`;
     intro = `${meName} created a new task you are part of.`;
     snippet = taskRow.description ?? "";
@@ -101,9 +99,7 @@ export async function POST(req: NextRequest) {
     if (taskRow.created_by && taskRow.created_by !== user.id) {
       add(team.find((p) => p.id === taskRow.created_by));
     }
-    if (taskRow.assigned_to && taskRow.assigned_to !== user.id) {
-      add(team.find((p) => p.id === taskRow.assigned_to));
-    }
+    getAssigneeIds(taskRow.assignee_ids, taskRow.assigned_to).forEach((id) => add(team.find((p) => p.id === id)));
     subject = `${meName} commented on: ${taskRow.title}`;
     intro = `${meName} added a comment on a task you are part of.`;
     snippet = body.commentBody;
@@ -140,6 +136,11 @@ export async function POST(req: NextRequest) {
 
   const results = await Promise.all(sends);
   return NextResponse.json({ ok: true, sent: results.filter(Boolean).length });
+}
+
+function getAssigneeIds(assigneeIds: string[] | null | undefined, assignedTo: string | null): string[] {
+  if (assigneeIds && assigneeIds.length > 0) return assigneeIds;
+  return assignedTo ? [assignedTo] : [];
 }
 
 function findMentions(text: string, team: Profile[]): Profile[] {

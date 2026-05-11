@@ -22,6 +22,7 @@ export type Task = {
   position: number;
   created_by: string;
   assigned_to: string | null;
+  assignee_ids: string[];
   images: string[];
   is_bug: boolean;
   created_at: string;
@@ -31,6 +32,7 @@ export type Task = {
 export type TaskWithPeople = Task & {
   creator: Profile | null;
   assignee: Profile | null;
+  assignees: Profile[];
 };
 
 export type TaskComment = {

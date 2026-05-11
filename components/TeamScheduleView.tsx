@@ -55,6 +55,8 @@ const DAYS: { key: Day; label: string }[] = [
 ];
 
 const HOURS = Array.from({ length: 16 }, (_, i) => 7 + i);
+const DAY_START_MINUTES = HOURS[0] * 60;
+const DAY_END_MINUTES = (HOURS[HOURS.length - 1] + 1) * 60;
 
 const TEAM_SCHEDULES: PersonSchedule[] = [
   { email: "elan@fieldvisionai.com", name: "Elan", blocks: [] },
@@ -174,6 +176,8 @@ export default function TeamScheduleView({
   const [status, setStatus] = useState<Status>("away");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<{ id: string; startTime: string; endTime: string } | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const profileByEmail = useMemo(
     () => new Map(team.map((p) => [p.email.toLowerCase(), p])),
@@ -219,8 +223,16 @@ export default function TeamScheduleView({
   const currentEvents = events.filter((event) => isNow(event, today));
 
   async function saveStatus() {
-    if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+
+    if (startMinutes >= endMinutes) {
       toast.error("End time must be after start time");
+      return;
+    }
+
+    if (startMinutes < DAY_START_MINUTES || endMinutes > DAY_END_MINUTES) {
+      toast.error("Choose a time between 7 AM and 11 PM");
       return;
     }
 
@@ -254,6 +266,39 @@ export default function TeamScheduleView({
       toast.error(error.message);
       return;
     }
+    router.refresh();
+  }
+
+  async function updateStatusTime() {
+    if (!editingEvent) return;
+    const startMinutes = timeToMinutes(editingEvent.startTime);
+    const endMinutes = timeToMinutes(editingEvent.endTime);
+
+    if (startMinutes >= endMinutes) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
+    if (startMinutes < DAY_START_MINUTES || endMinutes > DAY_END_MINUTES) {
+      toast.error("Choose a time between 7 AM and 11 PM");
+      return;
+    }
+
+    setUpdatingId(editingEvent.id);
+    const supabase = getSupabaseBrowser();
+    const { error } = await supabase
+      .from("schedule_overrides")
+      .update({ start_time: editingEvent.startTime, end_time: editingEvent.endTime })
+      .eq("id", editingEvent.id)
+      .eq("user_id", me.id);
+    setUpdatingId(null);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setEditingEvent(null);
     router.refresh();
   }
 
@@ -342,19 +387,23 @@ export default function TeamScheduleView({
 
             {DAYS.map((day) => {
               const dayEvents = events
-                .filter((event) => event.day === day.key)
+                .filter((event) => event.day === day.key && event.end > DAY_START_MINUTES && event.start < DAY_END_MINUTES)
                 .sort((a, b) => a.start - b.start);
 
               return (
-                <div key={day.key} className="relative border-r border-ink-100 last:border-r-0">
+                <div key={day.key} className="relative overflow-hidden border-r border-ink-100 last:border-r-0">
                   {HOURS.map((hour) => (
                     <div key={hour} className="h-20 border-b border-ink-100 bg-white" />
                   ))}
                   {dayEvents.map((event) => {
                     const profile = profileByEmail.get(event.email) ?? profileById.get(event.userId) ?? null;
                     const color = profile ? profileColor(profile) : profileColor(event.email);
-                    const top = ((event.start - HOURS[0] * 60) / 60) * 80;
-                    const height = Math.max(((event.end - event.start) / 60) * 80, 34);
+                    const visibleStart = Math.max(event.start, DAY_START_MINUTES);
+                    const visibleEnd = Math.min(event.end, DAY_END_MINUTES);
+                    const top = ((visibleStart - DAY_START_MINUTES) / 60) * 80;
+                    const height = Math.max(((visibleEnd - visibleStart) / 60) * 80, 34);
+                    const canEdit = event.temporary && event.userId === me.id;
+                    const isEditing = editingEvent?.id === event.id;
 
                     return (
                       <div
@@ -369,14 +418,51 @@ export default function TeamScheduleView({
                           <div className="min-w-0">
                             <div className="truncate font-bold">{event.name}</div>
                             <div className="truncate font-semibold">{event.label}</div>
-                            <div className="opacity-80">
-                              {formatTime(event.start)} to {formatTime(event.end)}
-                            </div>
+                            {isEditing ? (
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                <input
+                                  type="time"
+                                  value={editingEvent.startTime}
+                                  onChange={(e) => setEditingEvent({ ...editingEvent, startTime: e.target.value })}
+                                  className="w-[82px] rounded-md border border-current/20 bg-white/70 px-1 py-0.5 text-[11px]"
+                                />
+                                <input
+                                  type="time"
+                                  value={editingEvent.endTime}
+                                  onChange={(e) => setEditingEvent({ ...editingEvent, endTime: e.target.value })}
+                                  className="w-[82px] rounded-md border border-current/20 bg-white/70 px-1 py-0.5 text-[11px]"
+                                />
+                                <button onClick={updateStatusTime} disabled={updatingId === event.id} className="rounded-md bg-white/70 px-1.5 py-0.5 font-bold">
+                                  Save
+                                </button>
+                                <button onClick={() => setEditingEvent(null)} className="rounded-md bg-white/70 px-1.5 py-0.5 font-bold">
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="opacity-80">
+                                {formatTime(event.start)} to {formatTime(event.end)}
+                              </div>
+                            )}
                           </div>
-                          {event.temporary && event.userId === me.id && (
-                            <button onClick={() => removeStatus(event.id)} title="Remove status" className="rounded p-0.5 hover:bg-white/50">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                          {canEdit && !isEditing && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                onClick={() =>
+                                  setEditingEvent({
+                                    id: event.id,
+                                    startTime: minutesToTimeInput(event.start),
+                                    endTime: minutesToTimeInput(event.end)
+                                  })
+                                }
+                                className="rounded px-1 py-0.5 text-[11px] font-bold hover:bg-white/50"
+                              >
+                                Edit
+                              </button>
+                              <button onClick={() => removeStatus(event.id)} title="Remove status" className="rounded p-0.5 hover:bg-white/50">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -448,6 +534,12 @@ function toDateInput(date: Date) {
 function timeToMinutes(value: string) {
   const [hour, minute] = value.split(":").map(Number);
   return hour * 60 + minute;
+}
+
+function minutesToTimeInput(minutes: number) {
+  const hour = Math.floor(minutes / 60).toString().padStart(2, "0");
+  const minute = (minutes % 60).toString().padStart(2, "0");
+  return `${hour}:${minute}`;
 }
 
 function formatDay(date: Date) {

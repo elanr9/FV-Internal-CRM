@@ -39,11 +39,17 @@ export default async function BoardPage({ params }: { params: { workflow: string
   const profileById = new Map(team.map((p) => [p.id, p]));
   const me = team.find((p) => p.id === user?.id) ?? null;
 
-  const enriched: TaskWithPeople[] = ((tasks as Task[]) ?? []).map((t) => ({
-    ...t,
-    creator: profileById.get(t.created_by) ?? null,
-    assignee: t.assigned_to ? profileById.get(t.assigned_to) ?? null : null
-  }));
+  const enriched: TaskWithPeople[] = ((tasks as Task[]) ?? []).map((t) => {
+    const assigneeIds = (t.assignee_ids ?? []).length > 0 ? t.assignee_ids : t.assigned_to ? [t.assigned_to] : [];
+    return {
+      ...t,
+      creator: profileById.get(t.created_by) ?? null,
+      assignee: t.assigned_to ? profileById.get(t.assigned_to) ?? null : null,
+      assignees: assigneeIds
+        .map((id) => profileById.get(id))
+        .filter((p): p is Profile => Boolean(p))
+    };
+  });
 
   return (
     <BoardView

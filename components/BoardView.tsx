@@ -53,8 +53,9 @@ export default function BoardView({
           return false;
         }
       }
-      if (assigneeFilter === "unassigned" && t.assigned_to) return false;
-      if (assigneeFilter !== "all" && assigneeFilter !== "unassigned" && t.assigned_to !== assigneeFilter) {
+      const assigneeIds = (t.assignee_ids ?? []).length > 0 ? t.assignee_ids : t.assigned_to ? [t.assigned_to] : [];
+      if (assigneeFilter === "unassigned" && assigneeIds.length > 0) return false;
+      if (assigneeFilter !== "all" && assigneeFilter !== "unassigned" && !assigneeIds.includes(assigneeFilter)) {
         return false;
       }
       if (difficultyFilter !== "all" && t.difficulty !== difficultyFilter) return false;

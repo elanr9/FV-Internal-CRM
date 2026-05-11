@@ -62,8 +62,14 @@ export default function TaskModal(props: Props) {
   const [status, setStatus] = useState<Status>(initial?.status ?? props.defaultStatus ?? "todo");
   const [difficulty, setDifficulty] = useState<Difficulty>(initial?.difficulty ?? "medium");
   const [dueDate, setDueDate] = useState<string>(initial?.due_date ?? props.defaultDueDate ?? "");
-  const [assignedTo, setAssignedTo] = useState<string>(
-    initial?.assigned_to ?? props.defaultAssignedTo ?? ""
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(
+    initial
+      ? (initial.assignee_ids ?? []).length > 0
+        ? initial.assignee_ids
+        : initial.assigned_to
+          ? [initial.assigned_to]
+          : []
+      : [props.defaultAssignedTo ?? props.me.id].filter(Boolean)
   );
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [busy, setBusy] = useState(false);
@@ -118,7 +124,8 @@ export default function TaskModal(props: Props) {
       status,
       difficulty,
       due_date: dueDate || null,
-      assigned_to: assignedTo || null,
+      assigned_to: assigneeIds[0] ?? null,
+      assignee_ids: assigneeIds,
       images
     };
 
@@ -127,10 +134,16 @@ export default function TaskModal(props: Props) {
       setBusy(false);
       if (error) return toast.error(error.message);
       toast.success("Task updated");
-      const assigneeChanged = assignedTo && assignedTo !== initial.assigned_to;
-      if (assigneeChanged) {
-        notify({ kind: "task_assigned", taskId: initial.id, assigneeId: assignedTo });
-      }
+      const previous = new Set(
+        (initial.assignee_ids ?? []).length > 0
+          ? initial.assignee_ids
+          : initial.assigned_to
+            ? [initial.assigned_to]
+            : []
+      );
+      assigneeIds
+        .filter((id) => !previous.has(id))
+        .forEach((assigneeId) => notify({ kind: "task_assigned", taskId: initial.id, assigneeId }));
     } else {
       const { data: created, error } = await supabase
         .from("tasks")
@@ -154,6 +167,12 @@ export default function TaskModal(props: Props) {
       body: JSON.stringify(payload),
       keepalive: true
     }).catch(() => {});
+  }
+
+  function toggleAssignee(id: string) {
+    setAssigneeIds((prev) =>
+      prev.includes(id) ? prev.filter((assigneeId) => assigneeId !== id) : [...prev, id]
+    );
   }
 
   async function remove() {
@@ -373,20 +392,29 @@ export default function TaskModal(props: Props) {
               </select>
             </Field>
 
-            <Field label="Owner">
-              <select
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="input"
-              >
-                <option value="">Unassigned</option>
+            <div>
+              <SectionLabel>Assignees</SectionLabel>
+              <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-ink-100 bg-white p-2">
                 {props.team.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name ?? p.email}
-                  </option>
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={assigneeIds.includes(p.id)}
+                      onChange={() => toggleAssignee(p.id)}
+                      className="h-4 w-4 rounded border-ink-300 text-brand-600"
+                    />
+                    <Avatar profile={p} size={24} />
+                    <span className="truncate">{p.full_name ?? p.email}</span>
+                  </label>
                 ))}
-              </select>
-            </Field>
+                {props.team.length === 0 && (
+                  <div className="px-2 py-3 text-sm text-ink-400">No teammates yet.</div>
+                )}
+              </div>
+            </div>
 
             <Field label="Due date">
               <input

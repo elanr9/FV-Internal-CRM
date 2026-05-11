@@ -34,7 +34,7 @@ export default async function MyWeekPage() {
     supabase
       .from("tasks")
       .select("*")
-      .eq("assigned_to", user.id)
+      .or(`assigned_to.eq.${user.id},assignee_ids.cs.{${user.id}}`)
       .neq("status", "done")
       .order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("profiles").select("id, email, full_name, avatar_url, role"),
@@ -56,11 +56,17 @@ export default async function MyWeekPage() {
     role: "member" as const
   };
 
-  const enriched: TaskWithPeople[] = ((tasks as Task[]) ?? []).map((t) => ({
-    ...t,
-    creator: profileById.get(t.created_by) ?? null,
-    assignee: t.assigned_to ? profileById.get(t.assigned_to) ?? null : null
-  }));
+  const enriched: TaskWithPeople[] = ((tasks as Task[]) ?? []).map((t) => {
+    const assigneeIds = (t.assignee_ids ?? []).length > 0 ? t.assignee_ids : t.assigned_to ? [t.assigned_to] : [];
+    return {
+      ...t,
+      creator: profileById.get(t.created_by) ?? null,
+      assignee: t.assigned_to ? profileById.get(t.assigned_to) ?? null : null,
+      assignees: assigneeIds
+        .map((id) => profileById.get(id))
+        .filter((p): p is Profile => Boolean(p))
+    };
+  });
 
   return (
     <WeekView

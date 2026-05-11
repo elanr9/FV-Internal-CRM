@@ -37,6 +37,7 @@ export default function TaskCard({
 }) {
   const due = task.due_date ? parseISO(task.due_date) : null;
   const overdue = due ? isPast(due) && !isToday(due) && task.status !== "done" : false;
+  const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
 
   return (
     <button
@@ -53,7 +54,15 @@ export default function TaskCard({
             <div className="mt-0.5 line-clamp-1 text-xs text-ink-400">{task.description}</div>
           )}
         </div>
-        {task.assignee && <Avatar profile={task.assignee} size={22} />}
+        {assignees.length > 0 && (
+          <span className="flex -space-x-1">
+            {assignees.slice(0, 3).map((p) => (
+              <span key={p.id} className="rounded-full ring-2 ring-white">
+                <Avatar profile={p} size={22} />
+              </span>
+            ))}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
