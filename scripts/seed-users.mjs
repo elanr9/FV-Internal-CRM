@@ -31,46 +31,61 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
 const PASSWORD = "FieldVision9";
 
 const USERS = [
-  { email: "sebas@fieldvisionai.com", full_name: "Sebas" },
-  { email: "lucho@fieldvisionai.com", full_name: "Lucho" },
-  { email: "fabri@fieldvisionai.com", full_name: "Fabri" },
-  { email: "isaac@fieldvisionai.com", full_name: "Isaac" },
-  { email: "tona@fieldvisionai.com", full_name: "Tona" },
-  { email: "gabe@fieldvisionai.com", full_name: "Gabe" },
-  { email: "elan@fieldvisionai.com", full_name: "Elan" }
+  { email: "founders@fieldvisionai.com", full_name: "Elan", aliases: ["elan@fieldvisionai.com"] },
+  { email: "fabri@fieldvisionai.com", full_name: "Fabri", aliases: [] },
+  { email: "gdiaz0618@uchicago.edu", full_name: "Gaby", aliases: ["gabe@fieldvisionai.com"] },
+  { email: "tonasanchezboss@gmail.com", full_name: "Tona", aliases: ["tona@fieldvisionai.com"] },
+  { email: "sebasdlc704@gmail.com", full_name: "Sebas", aliases: ["sebas@fieldvisionai.com"] },
+  { email: "danielguerrero0803@gmail.com", full_name: "Trav", aliases: [] }
 ];
 
+const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers({
+  perPage: 200
+});
+
+if (listError) {
+  console.error("Failed to list users: " + listError.message);
+  process.exit(1);
+}
+
+const allUsers = existingUsers.users;
+
 for (const u of USERS) {
-  const { data, error } = await supabase.auth.admin.createUser({
-    email: u.email,
-    password: PASSWORD,
-    email_confirm: true,
-    user_metadata: { full_name: u.full_name }
+  const names = [u.full_name.toLowerCase()];
+  const emails = [u.email.toLowerCase(), ...u.aliases.map((email) => email.toLowerCase())];
+  const existing = allUsers.find((x) => {
+    const email = x.email?.toLowerCase();
+    const name = String(x.user_metadata?.full_name ?? "").toLowerCase();
+    return Boolean((email && emails.includes(email)) || (name && names.includes(name)));
   });
 
-  let userId = data?.user?.id ?? null;
+  let userId = existing?.id ?? null;
 
-  if (error) {
-    if (/already|registered|exists/i.test(error.message)) {
-      const { data: list } = await supabase.auth.admin.listUsers({ perPage: 200 });
-      const existing = list?.users.find((x) => x.email === u.email);
-      userId = existing?.id ?? null;
-      if (userId) {
-        await supabase.auth.admin.updateUserById(userId, {
-          password: PASSWORD,
-          email_confirm: true,
-          user_metadata: { full_name: u.full_name }
-        });
-        console.log(`updated: ${u.email}`);
-      } else {
-        console.error(`fail:    ${u.email} :: ${error.message}`);
-        continue;
-      }
-    } else {
+  if (userId) {
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      email: u.email,
+      email_confirm: true,
+      user_metadata: { full_name: u.full_name }
+    });
+    if (error) {
       console.error(`fail:    ${u.email} :: ${error.message}`);
       continue;
     }
+    console.log(`updated: ${u.email}`);
   } else {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: u.email,
+      password: PASSWORD,
+      email_confirm: true,
+      user_metadata: { full_name: u.full_name }
+    });
+
+    if (error) {
+      console.error(`fail:    ${u.email} :: ${error.message}`);
+      continue;
+    }
+
+    userId = data?.user?.id ?? null;
     console.log(`created: ${u.email}`);
   }
 
@@ -83,4 +98,4 @@ for (const u of USERS) {
   }
 }
 
-console.log("\nDone. Password for all accounts: " + PASSWORD);
+console.log("\nDone. New accounts start with password: " + PASSWORD);

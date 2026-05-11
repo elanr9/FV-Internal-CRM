@@ -1,7 +1,8 @@
-export type Workflow = "engineering" | "growth" | "content";
+export type Workflow = "engineering" | "growth" | "content" | "feature_ideas";
 export type Status = "backlog" | "todo" | "in_progress" | "in_review" | "done";
 export type Difficulty = "easy" | "medium" | "hard" | "epic";
 export type Role = "member" | "admin";
+export type AssigneeStatuses = Partial<Record<string, Status>>;
 
 export type Profile = {
   id: string;
@@ -23,6 +24,7 @@ export type Task = {
   created_by: string;
   assigned_to: string | null;
   assignee_ids: string[];
+  assignee_statuses: AssigneeStatuses;
   images: string[];
   is_bug: boolean;
   created_at: string;
@@ -44,12 +46,13 @@ export type TaskComment = {
   author: Profile | null;
 };
 
-export const WORKFLOWS: Workflow[] = ["engineering", "growth", "content"];
+export const WORKFLOWS: Workflow[] = ["engineering", "growth", "content", "feature_ideas"];
 
 export const WORKFLOW_LABEL: Record<Workflow, string> = {
   engineering: "Engineering",
   growth: "Growth",
-  content: "Content"
+  content: "Content",
+  feature_ideas: "Feature Ideas"
 };
 
 export const STATUS_LABEL: Record<Status, string> = {

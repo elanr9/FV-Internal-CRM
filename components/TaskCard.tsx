@@ -9,7 +9,8 @@ import Avatar from "./Avatar";
 const WORKFLOW_DOT: Record<Workflow, string> = {
   engineering: "bg-brand-500",
   growth: "bg-emerald-500",
-  content: "bg-fuchsia-500"
+  content: "bg-fuchsia-500",
+  feature_ideas: "bg-amber-500"
 };
 
 const STATUS_PILL: Record<Status, string> = {
@@ -30,13 +31,16 @@ const STATUS_LABEL_SHORT: Record<Status, string> = {
 
 export default function TaskCard({
   task,
+  profileId,
   onClick
 }: {
   task: TaskWithPeople;
+  profileId?: string;
   onClick: () => void;
 }) {
+  const visibleStatus = profileId ? task.assignee_statuses?.[profileId] ?? task.status : task.status;
   const due = task.due_date ? parseISO(task.due_date) : null;
-  const overdue = due ? isPast(due) && !isToday(due) && task.status !== "done" : false;
+  const overdue = due ? isPast(due) && !isToday(due) && visibleStatus !== "done" : false;
   const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
   const assignorName = task.creator?.full_name ?? task.creator?.email.split("@")[0] ?? "Unknown";
 
@@ -71,8 +75,8 @@ export default function TaskCard({
           <Avatar profile={task.creator} size={16} />
           From {assignorName}
         </span>
-        <span className={clsx("inline-flex rounded-full px-2 py-0.5 font-semibold", STATUS_PILL[task.status])}>
-          {STATUS_LABEL_SHORT[task.status]}
+        <span className={clsx("inline-flex rounded-full px-2 py-0.5 font-semibold", STATUS_PILL[visibleStatus])}>
+          {STATUS_LABEL_SHORT[visibleStatus]}
         </span>
         {due && (
           <span

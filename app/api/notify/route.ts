@@ -7,6 +7,18 @@ export const runtime = "nodejs";
 
 const FROM = "Field Vision <founders@fieldvisionai.com>";
 
+const REAL_EMAIL_BY_HANDLE: Record<string, string> = {
+  elan: "founders@fieldvisionai.com",
+  founders: "founders@fieldvisionai.com",
+  fabri: "fabri@fieldvisionai.com",
+  gabe: "gdiaz0618@uchicago.edu",
+  gaby: "gdiaz0618@uchicago.edu",
+  tona: "tonasanchezboss@gmail.com",
+  lucho: "founders@fieldvisionai.com",
+  sebas: "founders@fieldvisionai.com",
+  trav: "danielguerrero0803@gmail.com"
+};
+
 type TaskAssignedBody = {
   kind: "task_assigned";
   taskId: string;
@@ -49,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const { data: taskRow, error: taskErr } = await supabase
     .from("tasks")
-    .select("id, title, description, workflow, assigned_to, assignee_ids, created_by")
+    .select("id, title, description, workflow, due_date, assigned_to, assignee_ids, created_by")
     .eq("id", body.taskId)
     .maybeSingle();
   if (taskErr || !taskRow) {
@@ -68,30 +80,32 @@ export async function POST(req: NextRequest) {
   const link = `${appUrl}/board/${taskRow.workflow}`;
 
   const resend = new Resend(apiKey);
-  const recipients = new Map<string, Profile>();
+  const recipients = new Map<string, { profile: Profile; email: string }>();
   const add = (p: Profile | null | undefined) => {
     if (!p) return;
     if (p.id === user.id) return;
-    if (!p.email) return;
-    recipients.set(p.id, p);
+    const email = getDeliverableEmail(p);
+    if (!email) return;
+    recipients.set(email, { profile: p, email });
   };
 
   let subject = "";
   let intro = "";
   let snippet = "";
+  let snippetLabel = "Description";
 
   if (body.kind === "task_assigned") {
     const assignee = team.find((p) => p.id === body.assigneeId);
     add(assignee);
-    subject = `${meName} assigned you: ${taskRow.title}`;
-    intro = `${meName} assigned a task to you.`;
+    subject = `${meName} gave you a task: ${taskRow.title}`;
+    intro = `${meName} gave you a task:`;
     snippet = taskRow.description ?? "";
   } else if (body.kind === "task_created") {
-    const mentioned = findMentions(taskRow.description ?? "", team);
+    const mentioned = findMentions(`${taskRow.title}\n${taskRow.description ?? ""}`, team);
     mentioned.forEach(add);
     getAssigneeIds(taskRow.assignee_ids, taskRow.assigned_to).forEach((id) => add(team.find((p) => p.id === id)));
-    subject = `${meName} created a task: ${taskRow.title}`;
-    intro = `${meName} created a new task you are part of.`;
+    subject = `${meName} gave you a task: ${taskRow.title}`;
+    intro = `${meName} gave you a task:`;
     snippet = taskRow.description ?? "";
   } else if (body.kind === "comment_posted") {
     const mentioned = findMentions(body.commentBody, team);
@@ -100,9 +114,10 @@ export async function POST(req: NextRequest) {
       add(team.find((p) => p.id === taskRow.created_by));
     }
     getAssigneeIds(taskRow.assignee_ids, taskRow.assigned_to).forEach((id) => add(team.find((p) => p.id === id)));
-    subject = `${meName} commented on: ${taskRow.title}`;
-    intro = `${meName} added a comment on a task you are part of.`;
+    subject = `${meName} left a comment: ${taskRow.title}`;
+    intro = `${meName} left a comment on a task you are part of.`;
     snippet = body.commentBody;
+    snippetLabel = "Comment";
   } else {
     return NextResponse.json({ ok: false, error: "bad_kind" }, { status: 400 });
   }
@@ -111,21 +126,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, sent: 0 });
   }
 
-  const sends = Array.from(recipients.values()).map(async (p) => {
+  const sends = Array.from(recipients.values()).map(async ({ profile, email }) => {
     const html = renderEmail({
-      recipientName: p.full_name || p.email,
+      recipientName: profile.full_name || email,
       intro,
       title: taskRow.title,
       snippet,
+      snippetLabel,
+      dueDate: taskRow.due_date,
       link
     });
     try {
       await resend.emails.send({
         from: FROM,
-        to: p.email,
+        to: email,
         subject,
         html,
-        text: `${intro}\n\nTask: ${taskRow.title}\n${snippet ? `\n${snippet}\n` : ""}\nOpen: ${link}`
+        text: `${intro}\n\nTask: ${taskRow.title}\n${snippet ? `\n${snippetLabel}: ${snippet}\n` : ""}\nDue date: ${formatDueDate(taskRow.due_date)}\n\nOpen in CRM: ${link}`
       });
       return true;
     } catch (e) {
@@ -141,6 +158,24 @@ export async function POST(req: NextRequest) {
 function getAssigneeIds(assigneeIds: string[] | null | undefined, assignedTo: string | null): string[] {
   if (assigneeIds && assigneeIds.length > 0) return assigneeIds;
   return assignedTo ? [assignedTo] : [];
+}
+
+function getDeliverableEmail(profile: Profile): string | null {
+  const email = profile.email.toLowerCase();
+  const handle = email.split("@")[0];
+  const nameHandle = profile.full_name?.trim().split(/\s+/)[0]?.toLowerCase();
+  if (nameHandle === "lucho" || nameHandle === "sebas") return "founders@fieldvisionai.com";
+  const mappedEmail = REAL_EMAIL_BY_HANDLE[handle];
+  if (mappedEmail) return mappedEmail;
+  if (email.endsWith("@fieldvisionai.com")) return null;
+  return profile.email;
+}
+
+function formatDueDate(dueDate: string | null | undefined) {
+  if (!dueDate) return "No due date";
+  const [year, month, day] = dueDate.split("-");
+  if (!year || !month || !day) return dueDate;
+  return `${month}/${day}/${year}`;
 }
 
 function findMentions(text: string, team: Profile[]): Profile[] {
@@ -169,19 +204,26 @@ function renderEmail({
   intro,
   title,
   snippet,
+  snippetLabel,
+  dueDate,
   link
 }: {
   recipientName: string;
   intro: string;
   title: string;
   snippet: string;
+  snippetLabel: string;
+  dueDate: string | null;
   link: string;
 }) {
   const safeSnippet = snippet
-    ? `<div style="margin:16px 0;padding:14px 16px;background:#f6f7fb;border-radius:12px;color:#374151;font-size:14px;white-space:pre-wrap">${escapeHtml(
+    ? `<div style="font-size:12px;font-weight:700;color:#64748b;margin:18px 0 6px">${escapeHtml(
+        snippetLabel
+      )}</div><div style="padding:14px 16px;background:#f6f7fb;border-radius:12px;color:#374151;font-size:14px;line-height:1.5;white-space:pre-wrap">${escapeHtml(
         snippet
       )}</div>`
     : "";
+  const safeDueDate = escapeHtml(formatDueDate(dueDate));
   return `<!doctype html>
 <html>
 <body style="margin:0;padding:0;background:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif;color:#0f172a">
@@ -189,9 +231,12 @@ function renderEmail({
     <div style="font-size:13px;color:#64748b;margin-bottom:8px">Field Vision</div>
     <div style="font-size:18px;font-weight:700;margin-bottom:4px">Hi ${escapeHtml(recipientName)}</div>
     <div style="font-size:14px;color:#475569;margin-bottom:18px">${escapeHtml(intro)}</div>
-    <div style="font-size:16px;font-weight:600;margin-bottom:4px">${escapeHtml(title)}</div>
+    <div style="font-size:12px;font-weight:700;color:#64748b;margin:0 0 6px">Task</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;color:#0f172a">${escapeHtml(title)}</div>
     ${safeSnippet}
-    <a href="${link}" style="display:inline-block;margin-top:8px;background:#0f172a;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600">Open in CRM</a>
+    <div style="font-size:12px;font-weight:700;color:#64748b;margin:18px 0 6px">Due date</div>
+    <div style="font-size:14px;color:#0f172a;margin-bottom:20px">${safeDueDate}</div>
+    <a href="${link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:700">Open in CRM</a>
     <div style="margin-top:24px;font-size:12px;color:#94a3b8">You are receiving this because you were added to a Field Vision task.</div>
   </div>
 </body>

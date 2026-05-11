@@ -22,7 +22,7 @@ export default function LoginPage() {
             </h1>
             <p className="mt-5 max-w-md text-base text-ink-500">
               One clean home for engineering sprints, growth experiments, and content production.
-              Sign in with your email and pick up where the team left off.
+              Sign in with your first name and pick up where the team left off.
             </p>
             <ul className="mt-8 space-y-3 text-sm text-ink-700">
               <FeatureRow>Group work by Engineering, Growth, or Content</FeatureRow>
@@ -35,7 +35,7 @@ export default function LoginPage() {
             <div className="card w-full max-w-md p-8">
               <h2 className="text-2xl font-bold text-ink-900">Welcome back</h2>
               <p className="mt-1 text-sm text-ink-500">
-                Sign in with your team email and password.
+                Sign in with your first name and password.
               </p>
               <div className="mt-6">
                 <LoginForm />

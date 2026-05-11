@@ -1,6 +1,6 @@
 "use client";
 
-import { Code2, Search, Sparkles, Video } from "lucide-react";
+import { Code2, Lightbulb, Search, Sparkles, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type Difficulty,
@@ -16,13 +16,15 @@ import TaskTable from "./TaskTable";
 const WORKFLOW_ICON = {
   engineering: Code2,
   growth: Sparkles,
-  content: Video
+  content: Video,
+  feature_ideas: Lightbulb
 } as const;
 
 const WORKFLOW_ACCENT: Record<Workflow, string> = {
   engineering: "from-brand-500 to-brand-700",
   growth: "from-emerald-500 to-emerald-700",
-  content: "from-fuchsia-500 to-fuchsia-700"
+  content: "from-fuchsia-500 to-fuchsia-700",
+  feature_ideas: "from-amber-500 to-amber-700"
 };
 
 type FilterAssignee = "all" | "unassigned" | string;
@@ -83,7 +85,8 @@ export default function BoardView({
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-ink-900">{title}</h1>
             <p className="text-sm text-ink-400">
-              {tasks.length} task{tasks.length === 1 ? "" : "s"} across this workflow
+              {tasks.length} {workflow === "feature_ideas" ? "idea" : "task"}
+              {tasks.length === 1 ? "" : "s"} across this workflow
             </p>
           </div>
         </div>
@@ -140,7 +143,7 @@ export default function BoardView({
                 me={me}
                 workflow={workflow}
                 defaultStatus={group.status}
-                emptyHint={`No tasks in ${group.label.toLowerCase()}.`}
+                emptyHint={`No ${workflow === "feature_ideas" ? "ideas" : "tasks"} in ${group.label.toLowerCase()}.`}
               />
             </section>
           ))}

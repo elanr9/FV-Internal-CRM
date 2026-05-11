@@ -73,6 +73,7 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
               <TaskRow
                 key={task.id}
                 task={task}
+                me={me}
                 showWorkflow={showWorkflow}
                 onOpen={() => setOpen(task)}
               />
@@ -86,7 +87,7 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
                     className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-ink-400 transition hover:bg-ink-50 hover:text-brand-700"
                   >
                     <Plus className="h-4 w-4" />
-                    Add task
+                    {workflow === "feature_ideas" ? "Add idea" : "Add task"}
                   </button>
                 </td>
               </tr>
@@ -121,10 +122,12 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
 
 function TaskRow({
   task,
+  me,
   showWorkflow,
   onOpen
 }: {
   task: TaskWithPeople;
+  me: Profile | null;
   showWorkflow?: boolean;
   onOpen: () => void;
 }) {
@@ -143,8 +146,22 @@ function TaskRow({
     router.refresh();
   }
 
+  function assigneeStatus(profileId: string): Status {
+    return task.assignee_statuses?.[profileId] ?? task.status;
+  }
+
+  function patchAssigneeStatus(profileId: string, status: Status) {
+    patch({
+      assignee_statuses: {
+        ...(task.assignee_statuses ?? {}),
+        [profileId]: status
+      }
+    });
+  }
+
   const due = task.due_date ? parseISO(task.due_date) : null;
   const hasAttachments = task.images.length > 0;
+  const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
 
   return (
     <tr
@@ -180,9 +197,13 @@ function TaskRow({
         </td>
       )}
       <td className="px-4 py-3">
-        <StatusSelect
-          value={task.status}
-          onChange={(status) => patch({ status })}
+        <ProgressCell
+          assignees={assignees}
+          me={me}
+          taskStatus={task.status}
+          getStatus={assigneeStatus}
+          onTaskStatusChange={(status) => patch({ status })}
+          onAssigneeStatusChange={patchAssigneeStatus}
         />
       </td>
       <td className="px-4 py-3">
@@ -207,6 +228,46 @@ function TaskRow({
         {format(parseISO(task.created_at), "MMM d")}
       </td>
     </tr>
+  );
+}
+
+function ProgressCell({
+  assignees,
+  me,
+  taskStatus,
+  getStatus,
+  onTaskStatusChange,
+  onAssigneeStatusChange
+}: {
+  assignees: Profile[];
+  me: Profile | null;
+  taskStatus: Status;
+  getStatus: (profileId: string) => Status;
+  onTaskStatusChange: (status: Status) => void;
+  onAssigneeStatusChange: (profileId: string, status: Status) => void;
+}) {
+  if (assignees.length === 0) {
+    return <StatusSelect value={taskStatus} onChange={onTaskStatusChange} />;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {assignees.map((profile) => {
+        const status = getStatus(profile.id);
+        const name = profile.full_name ?? profile.email.split("@")[0];
+        return (
+          <div key={profile.id} className="flex items-center gap-2">
+            <Avatar profile={profile} size={22} />
+            <span className="max-w-20 truncate text-xs font-semibold text-ink-600">{name}</span>
+            {me?.id === profile.id ? (
+              <StatusSelect value={status} onChange={(next) => onAssigneeStatusChange(profile.id, next)} />
+            ) : (
+              <StatusBadge status={status} />
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -256,6 +317,7 @@ function NewTaskRow({
       due_date: dueDate,
       assigned_to: assignedTo,
       assignee_ids: assignedTo ? [assignedTo] : [],
+      assignee_statuses: assignedTo ? { [assignedTo]: status } : {},
       images: [],
       created_by: me.id
     });
@@ -323,7 +385,8 @@ function WorkflowChip({ workflow }: { workflow: Workflow }) {
   const map: Record<Workflow, string> = {
     engineering: "bg-brand-50 text-brand-700",
     growth: "bg-emerald-50 text-emerald-700",
-    content: "bg-fuchsia-50 text-fuchsia-700"
+    content: "bg-fuchsia-50 text-fuchsia-700",
+    feature_ideas: "bg-amber-50 text-amber-700"
   };
   return (
     <span className={clsx("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize", map[workflow])}>
@@ -380,6 +443,21 @@ function StatusSelect({
       </select>
       <Caret />
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  const styles: Record<Status, string> = {
+    backlog: "bg-ink-100 text-ink-600",
+    todo: "bg-ink-100 text-ink-700",
+    in_progress: "bg-brand-100 text-brand-700",
+    in_review: "bg-amber-100 text-amber-800",
+    done: "bg-emerald-100 text-emerald-800"
+  };
+  return (
+    <span className={clsx("rounded-full px-2.5 py-1 text-xs font-semibold", styles[status])}>
+      {STATUS_LABEL[status]}
+    </span>
   );
 }
 

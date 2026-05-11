@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Code2, Sparkles, Video, User, LogOut, Calendar, ShieldAlert, Users } from "lucide-react";
+import { Code2, Lightbulb, Sparkles, Video, User, LogOut, Calendar, ShieldAlert, Users } from "lucide-react";
 import clsx from "clsx";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
@@ -72,6 +72,13 @@ export default function Sidebar({ me, team }: Props) {
             accent="text-fuchsia-600"
             active={pathname?.startsWith("/board/content") ?? false}
           />
+          <SidebarLink
+            href="/board/feature_ideas"
+            label="Feature Ideas"
+            icon={Lightbulb}
+            accent="text-amber-600"
+            active={pathname?.startsWith("/board/feature_ideas") ?? false}
+          />
         </ul>
 
         <SectionLabel className="mt-6">Personal</SectionLabel>
@@ -94,6 +101,13 @@ export default function Sidebar({ me, team }: Props) {
 
         <SectionLabel className="mt-6">Team</SectionLabel>
         <ul className="space-y-0.5">
+          <SidebarLink
+            href="/team/week"
+            label="Team week"
+            icon={Calendar}
+            accent="text-cyan-600"
+            active={pathname === "/team/week"}
+          />
           <SidebarLink
             href="/team/schedule"
             label="Team schedule"

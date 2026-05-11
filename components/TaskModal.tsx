@@ -12,6 +12,7 @@ import {
   STATUS_LABEL,
   WORKFLOWS,
   WORKFLOW_LABEL,
+  type AssigneeStatuses,
   type Difficulty,
   type Profile,
   type Status,
@@ -75,6 +76,9 @@ export default function TaskModal(props: Props) {
           : []
       : [props.defaultAssignedTo ?? props.me.id].filter(Boolean)
   );
+  const [assigneeStatuses, setAssigneeStatuses] = useState<AssigneeStatuses>(
+    initial?.assignee_statuses ?? {}
+  );
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -82,6 +86,7 @@ export default function TaskModal(props: Props) {
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const isFeatureIdea = workflow === "feature_ideas";
 
   useEffect(() => {
     if (!isEdit || !initial) return;
@@ -116,10 +121,14 @@ export default function TaskModal(props: Props) {
 
   async function save() {
     if (!title.trim()) {
-      toast.error("Give the task a title.");
+      toast.error(isFeatureIdea ? "Give the idea a title." : "Give the task a title.");
       return;
     }
     setBusy(true);
+
+    const nextAssigneeStatuses = Object.fromEntries(
+      assigneeIds.map((id) => [id, assigneeStatuses[id] ?? status])
+    ) as AssigneeStatuses;
 
     const payload = {
       title: title.trim(),
@@ -130,6 +139,7 @@ export default function TaskModal(props: Props) {
       due_date: dueDate || null,
       assigned_to: assigneeIds[0] ?? null,
       assignee_ids: assigneeIds,
+      assignee_statuses: nextAssigneeStatuses,
       images
     };
 
@@ -137,7 +147,7 @@ export default function TaskModal(props: Props) {
       const { error } = await supabase.from("tasks").update(payload).eq("id", initial.id);
       setBusy(false);
       if (error) return toast.error(error.message);
-      toast.success("Task updated");
+      toast.success(isFeatureIdea ? "Idea updated" : "Task updated");
       const previous = new Set(
         (initial.assignee_ids ?? []).length > 0
           ? initial.assignee_ids
@@ -155,8 +165,8 @@ export default function TaskModal(props: Props) {
         .select("id")
         .single();
       setBusy(false);
-      if (error || !created) return toast.error(error?.message ?? "Failed to create task");
-      toast.success("Task created");
+      if (error || !created) return toast.error(error?.message ?? (isFeatureIdea ? "Failed to create idea" : "Failed to create task"));
+      toast.success(isFeatureIdea ? "Idea created" : "Task created");
       notify({ kind: "task_created", taskId: created.id });
     }
 
@@ -174,9 +184,15 @@ export default function TaskModal(props: Props) {
   }
 
   function toggleAssignee(id: string) {
-    setAssigneeIds((prev) =>
-      prev.includes(id) ? prev.filter((assigneeId) => assigneeId !== id) : [...prev, id]
-    );
+    setAssigneeIds((prev) => {
+      if (prev.includes(id)) return prev.filter((assigneeId) => assigneeId !== id);
+      setAssigneeStatuses((current) => ({ ...current, [id]: status }));
+      return [...prev, id];
+    });
+  }
+
+  function setAssigneeStatus(id: string, nextStatus: Status) {
+    setAssigneeStatuses((current) => ({ ...current, [id]: nextStatus }));
   }
 
   async function remove() {
@@ -229,6 +245,7 @@ export default function TaskModal(props: Props) {
       { ...(data as TaskComment), author: props.me }
     ]);
     setNewComment("");
+    toast.success("Comment posted");
     notify({ kind: "comment_posted", taskId: initial.id, commentBody: body });
   }
 
@@ -237,7 +254,7 @@ export default function TaskModal(props: Props) {
       <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-pop">
         <header className="flex items-center justify-between border-b border-ink-100 px-6 py-4">
           <div className="text-sm font-semibold text-ink-400">
-            {isEdit ? "Edit task" : "New task"}
+            {isEdit ? (isFeatureIdea ? "Edit idea" : "Edit task") : isFeatureIdea ? "New idea" : "New task"}
           </div>
           <button onClick={props.onClose} className="rounded-full p-1.5 hover:bg-ink-100">
             <X className="h-4 w-4 text-ink-500" />
@@ -250,14 +267,14 @@ export default function TaskModal(props: Props) {
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="What needs to be done?"
+              placeholder={isFeatureIdea ? "What should we build?" : "What needs to be done?"}
               className="w-full bg-transparent text-2xl font-bold tracking-tight text-ink-900 placeholder-ink-300 outline-none"
             />
 
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add description, context, links, acceptance criteria..."
+              placeholder={isFeatureIdea ? "Add context, impact, links, or examples..." : "Add description, context, links, acceptance criteria..."}
               rows={5}
               className="input min-h-[120px] resize-y"
             />
@@ -300,6 +317,9 @@ export default function TaskModal(props: Props) {
             {isEdit && initial && (
               <div>
                 <SectionLabel>Comments</SectionLabel>
+                <p className="mb-3 text-xs text-ink-400">
+                  Comments email the task owner and assignees.
+                </p>
                 <div className="space-y-3">
                   {comments.length === 0 && (
                     <div className="rounded-xl border border-dashed border-ink-200 px-3 py-4 text-center text-xs text-ink-400">
@@ -419,6 +439,43 @@ export default function TaskModal(props: Props) {
                 )}
               </div>
             </div>
+
+            {assigneeIds.length > 0 && (
+              <div>
+                <SectionLabel>Progress</SectionLabel>
+                <div className="space-y-2 rounded-xl border border-ink-100 bg-white p-2">
+                  {assigneeIds.map((id) => {
+                    const profile = props.team.find((p) => p.id === id) ?? null;
+                    const currentStatus = assigneeStatuses[id] ?? status;
+                    return (
+                      <div key={id} className="flex items-center gap-2">
+                        <Avatar profile={profile} size={24} />
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink-700">
+                          {profile?.full_name ?? profile?.email ?? "Teammate"}
+                        </span>
+                        {props.me.id === id ? (
+                          <select
+                            value={currentStatus}
+                            onChange={(e) => setAssigneeStatus(id, e.target.value as Status)}
+                            className="input w-auto py-1 text-xs"
+                          >
+                            {STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {STATUS_LABEL[s]}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-700">
+                            {STATUS_LABEL[currentStatus]}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <Field label="Due date">
               <input

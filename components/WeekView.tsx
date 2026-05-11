@@ -100,7 +100,7 @@ export default function WeekView({ me, team, tasks, notes, weekStart }: Props) {
                     ) : (
                       <div className="space-y-2">
                         {todayTasks.map((t) => (
-                          <TaskCard key={t.id} task={t} onClick={() => setOpenTask(t)} />
+                          <TaskCard key={t.id} task={t} profileId={me.id} onClick={() => setOpenTask(t)} />
                         ))}
                       </div>
                     )}
@@ -211,7 +211,7 @@ export default function WeekView({ me, team, tasks, notes, weekStart }: Props) {
             ) : (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
                 {unscheduled.map((t) => (
-                  <TaskCard key={t.id} task={t} onClick={() => setOpenTask(t)} />
+                  <TaskCard key={t.id} task={t} profileId={me.id} onClick={() => setOpenTask(t)} />
                 ))}
               </div>
             )}
