@@ -1,6 +1,6 @@
 "use client";
 
-import { Code2, Plus, Search, Sparkles, Video } from "lucide-react";
+import { Code2, Search, Sparkles, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type Difficulty,
@@ -12,7 +12,6 @@ import {
   type Workflow
 } from "@/lib/types";
 import TaskTable from "./TaskTable";
-import TaskModal from "./TaskModal";
 
 const WORKFLOW_ICON = {
   engineering: Code2,
@@ -45,7 +44,6 @@ export default function BoardView({
   const [query, setQuery] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState<FilterAssignee>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<FilterDifficulty>("all");
-  const [creatingStatus, setCreatingStatus] = useState<Status | null>(null);
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -134,36 +132,19 @@ export default function BoardView({
             <section key={group.status}>
               <div className="mb-2 flex items-center gap-3">
                 <StatusGroupBadge status={group.status} count={group.tasks.length} />
-                <button
-                  onClick={() => setCreatingStatus(group.status)}
-                  className="btn-ghost text-xs text-ink-400 hover:text-ink-700"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add task
-                </button>
               </div>
               <TaskTable
                 tasks={group.tasks}
                 team={team}
                 me={me}
                 workflow={workflow}
+                defaultStatus={group.status}
                 emptyHint={`No tasks in ${group.label.toLowerCase()}.`}
               />
             </section>
           ))}
         </div>
       </div>
-
-      {creatingStatus && me && (
-        <TaskModal
-          mode="create"
-          team={team}
-          me={me}
-          defaultWorkflow={workflow}
-          defaultStatus={creatingStatus}
-          onClose={() => setCreatingStatus(null)}
-        />
-      )}
     </div>
   );
 }

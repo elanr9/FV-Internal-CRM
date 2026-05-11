@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Code2, Sparkles, Video, User, LogOut, Calendar, Bug, ShieldAlert } from "lucide-react";
+import { Code2, Sparkles, Video, User, LogOut, Calendar, ShieldAlert, Users } from "lucide-react";
 import clsx from "clsx";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
@@ -89,6 +89,17 @@ export default function Sidebar({ me, team }: Props) {
             icon={User}
             accent="text-ink-400"
             active={pathname === "/me/created"}
+          />
+        </ul>
+
+        <SectionLabel className="mt-6">Team</SectionLabel>
+        <ul className="space-y-0.5">
+          <SidebarLink
+            href="/team/schedule"
+            label="Team schedule"
+            icon={Users}
+            accent="text-cyan-600"
+            active={pathname === "/team/schedule"}
           />
         </ul>
 

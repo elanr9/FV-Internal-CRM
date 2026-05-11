@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { format, isToday, isTomorrow, isPast, parseISO } from "date-fns";
 import clsx from "clsx";
 import {
   STATUSES,
   STATUS_LABEL,
+  WORKFLOW_LABEL,
   DIFFICULTIES,
   DIFFICULTY_LABEL,
   type Difficulty,
@@ -14,32 +15,28 @@ import {
   type TaskWithPeople,
   type Workflow
 } from "@/lib/types";
-import Avatar from "./Avatar";
+import Avatar, { profileColor } from "./Avatar";
 import TaskModal from "./TaskModal";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Calendar, Paperclip, MessageSquare } from "lucide-react";
+import { Calendar, Paperclip, Plus } from "lucide-react";
 
 type Props = {
   tasks: TaskWithPeople[];
   team: Profile[];
   me: Profile | null;
   workflow?: Workflow;
+  defaultStatus?: Status;
   emptyHint?: string;
   showWorkflow?: boolean;
 };
 
-export default function TaskTable({ tasks, team, me, workflow, emptyHint, showWorkflow }: Props) {
+export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "todo", emptyHint, showWorkflow }: Props) {
   const [open, setOpen] = useState<TaskWithPeople | null>(null);
-
-  if (tasks.length === 0) {
-    return (
-      <div className="card flex items-center justify-center p-8 text-sm text-ink-400">
-        {emptyHint ?? "No tasks yet."}
-      </div>
-    );
-  }
+  const [adding, setAdding] = useState(false);
+  const canAdd = Boolean(me && workflow);
+  const columnCount = showWorkflow ? 8 : 7;
 
   return (
     <>
@@ -60,6 +57,13 @@ export default function TaskTable({ tasks, team, me, workflow, emptyHint, showWo
             </tr>
           </thead>
           <tbody>
+            {tasks.length === 0 && !adding && (
+              <tr>
+                <td colSpan={columnCount} className="px-4 py-8 text-center text-sm text-ink-400">
+                  {emptyHint ?? "No tasks yet."}
+                </td>
+              </tr>
+            )}
             {tasks.map((task) => (
               <TaskRow
                 key={task.id}
@@ -69,6 +73,31 @@ export default function TaskTable({ tasks, team, me, workflow, emptyHint, showWo
                 onOpen={() => setOpen(task)}
               />
             ))}
+            {adding && me && workflow && (
+              <NewTaskRow
+                team={team}
+                me={me}
+                workflow={workflow}
+                defaultStatus={defaultStatus}
+                showWorkflow={showWorkflow}
+                onCancel={() => setAdding(false)}
+                onCreated={() => setAdding(false)}
+              />
+            )}
+            {canAdd && !adding && (
+              <tr>
+                <td className="px-1" />
+                <td colSpan={columnCount - 1} className="px-4 py-2">
+                  <button
+                    onClick={() => setAdding(true)}
+                    className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-ink-400 transition hover:bg-ink-50 hover:text-brand-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add task
+                  </button>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -180,6 +209,111 @@ function TaskRow({
   );
 }
 
+function NewTaskRow({
+  team,
+  me,
+  workflow,
+  defaultStatus,
+  showWorkflow,
+  onCancel,
+  onCreated
+}: {
+  team: Profile[];
+  me: Profile;
+  workflow: Workflow;
+  defaultStatus: Status;
+  showWorkflow?: boolean;
+  onCancel: () => void;
+  onCreated: () => void;
+}) {
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState<Status>(defaultStatus);
+  const [assignedTo, setAssignedTo] = useState<string | null>(me.id);
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [dueDate, setDueDate] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const creatingRef = useRef(false);
+
+  async function createTask() {
+    if (creatingRef.current) return;
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      onCancel();
+      return;
+    }
+
+    creatingRef.current = true;
+    setBusy(true);
+    const supabase = getSupabaseBrowser();
+    const { error } = await supabase.from("tasks").insert({
+      title: cleanTitle,
+      description: null,
+      workflow,
+      status,
+      difficulty,
+      due_date: dueDate,
+      assigned_to: assignedTo,
+      images: [],
+      created_by: me.id
+    });
+    setBusy(false);
+
+    if (error) {
+      creatingRef.current = false;
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Task created");
+    onCreated();
+    router.refresh();
+  }
+
+  return (
+    <tr className={clsx("border-b border-ink-100 bg-brand-50/30", busy && "opacity-60")}>
+      <td className="px-1">
+        <StatusPill status={status} compact />
+      </td>
+      <td className="max-w-[480px] px-4 py-2">
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={createTask}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") createTask();
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="Task title"
+          className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-medium text-ink-900 outline-none focus:border-brand-500"
+          disabled={busy}
+        />
+      </td>
+      {showWorkflow && (
+        <td className="px-4 py-3">
+          <WorkflowChip workflow={workflow} />
+        </td>
+      )}
+      <td className="px-4 py-3">
+        <StatusSelect value={status} onChange={setStatus} />
+      </td>
+      <td className="px-4 py-3">
+        <AssigneeSelect value={assignedTo} team={team} onChange={setAssignedTo} />
+      </td>
+      <td className="px-4 py-3">
+        <DifficultySelect value={difficulty} onChange={setDifficulty} />
+      </td>
+      <td className="px-4 py-3">
+        <DueDate value={dueDate} onChange={setDueDate} />
+      </td>
+      <td className="px-4 py-3 text-xs text-ink-400">
+        New
+      </td>
+    </tr>
+  );
+}
+
 function WorkflowChip({ workflow }: { workflow: Workflow }) {
   const map: Record<Workflow, string> = {
     engineering: "bg-brand-50 text-brand-700",
@@ -188,7 +322,7 @@ function WorkflowChip({ workflow }: { workflow: Workflow }) {
   };
   return (
     <span className={clsx("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize", map[workflow])}>
-      {workflow}
+      {WORKFLOW_LABEL[workflow]}
     </span>
   );
 }
@@ -288,10 +422,16 @@ function AssigneeSelect({
   onChange: (v: string | null) => void;
 }) {
   const current = team.find((p) => p.id === value) ?? null;
+  const color = current ? profileColor(current) : null;
   return (
-    <label className="relative inline-flex cursor-pointer items-center gap-2 rounded-full px-1 py-0.5 hover:bg-ink-50">
+    <label
+      className={clsx(
+        "relative inline-flex cursor-pointer items-center gap-2 rounded-full px-1.5 py-0.5 transition",
+        color ? `${color.soft} ${color.text}` : "hover:bg-ink-50"
+      )}
+    >
       <Avatar profile={current} size={26} />
-      <span className="text-xs font-medium text-ink-700">
+      <span className="text-xs font-semibold">
         {current ? current.full_name ?? current.email.split("@")[0] : "Unassigned"}
       </span>
       <select
