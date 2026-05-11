@@ -57,6 +57,9 @@ const DAYS: { key: Day; label: string }[] = [
 const HOURS = Array.from({ length: 16 }, (_, i) => 7 + i);
 const DAY_START_MINUTES = HOURS[0] * 60;
 const DAY_END_MINUTES = (HOURS[HOURS.length - 1] + 1) * 60;
+const DATE_YEAR = "2026";
+const MIN_DATE = `${DATE_YEAR}-01-01`;
+const MAX_DATE = `${DATE_YEAR}-12-31`;
 
 const TEAM_SCHEDULES: PersonSchedule[] = [
   { email: "elan@fieldvisionai.com", name: "Elan", blocks: [] },
@@ -170,7 +173,7 @@ export default function TeamScheduleView({
   const today = new Date();
   const weekStart = startOfWeek(today);
   const [formOpen, setFormOpen] = useState(false);
-  const [date, setDate] = useState(toDateInput(addDays(today, 1)));
+  const [date, setDate] = useState(dateInCurrentYear(toDateInput(addDays(today, 1))));
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("12:00");
   const [status, setStatus] = useState<Status>("away");
@@ -346,7 +349,14 @@ export default function TeamScheduleView({
         {formOpen && (
           <div className="mt-4 rounded-2xl border border-ink-100 bg-ink-50 p-3">
             <div className="grid gap-2 md:grid-cols-[1fr_120px_120px_130px_1.5fr_auto]">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input bg-white" />
+              <input
+                type="date"
+                value={date}
+                min={MIN_DATE}
+                max={MAX_DATE}
+                onChange={(e) => setDate(dateInCurrentYear(e.target.value))}
+                className="input bg-white"
+              />
               <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input bg-white" />
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="input bg-white" />
               <select value={status} onChange={(e) => setStatus(e.target.value as Status)} className="input bg-white">
@@ -529,6 +539,13 @@ function addDays(date: Date, days: number) {
 
 function toDateInput(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function dateInCurrentYear(value: string) {
+  if (!value) return "";
+  const [, month, day] = value.split("-");
+  if (!month || !day) return value;
+  return `${DATE_YEAR}-${month}-${day}`;
 }
 
 function timeToMinutes(value: string) {

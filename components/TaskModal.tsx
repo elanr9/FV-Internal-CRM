@@ -22,6 +22,10 @@ import {
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import Avatar from "./Avatar";
 
+const DATE_YEAR = "2026";
+const MIN_DATE = `${DATE_YEAR}-01-01`;
+const MAX_DATE = `${DATE_YEAR}-12-31`;
+
 type Props =
   | {
       mode: "create";
@@ -61,7 +65,7 @@ export default function TaskModal(props: Props) {
   );
   const [status, setStatus] = useState<Status>(initial?.status ?? props.defaultStatus ?? "todo");
   const [difficulty, setDifficulty] = useState<Difficulty>(initial?.difficulty ?? "medium");
-  const [dueDate, setDueDate] = useState<string>(initial?.due_date ?? props.defaultDueDate ?? "");
+  const [dueDate, setDueDate] = useState<string>(dateInCurrentYear(initial?.due_date ?? props.defaultDueDate ?? ""));
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
     initial
       ? (initial.assignee_ids ?? []).length > 0
@@ -420,7 +424,9 @@ export default function TaskModal(props: Props) {
               <input
                 type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                min={MIN_DATE}
+                max={MAX_DATE}
+                onChange={(e) => setDueDate(dateInCurrentYear(e.target.value))}
                 className="input"
               />
             </Field>
@@ -430,9 +436,9 @@ export default function TaskModal(props: Props) {
                 <div className="flex items-center gap-2">
                   <Avatar profile={initial.creator} size={20} />
                   <span>
-                    Created by{" "}
+                    Given by{" "}
                     <span className="font-semibold text-ink-900">
-                      {initial.creator?.full_name ?? initial.creator?.email ?? "—"}
+                      {initial.creator?.full_name ?? initial.creator?.email ?? "Unknown"}
                     </span>
                   </span>
                 </div>
@@ -483,4 +489,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+function dateInCurrentYear(value: string) {
+  if (!value) return "";
+  const [, month, day] = value.split("-");
+  if (!month || !day) return value;
+  return `${DATE_YEAR}-${month}-${day}`;
 }

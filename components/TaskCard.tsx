@@ -38,6 +38,7 @@ export default function TaskCard({
   const due = task.due_date ? parseISO(task.due_date) : null;
   const overdue = due ? isPast(due) && !isToday(due) && task.status !== "done" : false;
   const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
+  const assignorName = task.creator?.full_name ?? task.creator?.email.split("@")[0] ?? "Unknown";
 
   return (
     <button
@@ -66,6 +67,10 @@ export default function TaskCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-full bg-ink-50 px-2 py-0.5 font-semibold text-ink-600">
+          <Avatar profile={task.creator} size={16} />
+          From {assignorName}
+        </span>
         <span className={clsx("inline-flex rounded-full px-2 py-0.5 font-semibold", STATUS_PILL[task.status])}>
           {STATUS_LABEL_SHORT[task.status]}
         </span>

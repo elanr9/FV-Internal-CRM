@@ -22,6 +22,10 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Calendar, Paperclip, Plus } from "lucide-react";
 
+const DATE_YEAR = "2026";
+const MIN_DATE = `${DATE_YEAR}-01-01`;
+const MAX_DATE = `${DATE_YEAR}-12-31`;
+
 type Props = {
   tasks: TaskWithPeople[];
   team: Profile[];
@@ -36,7 +40,7 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
   const [open, setOpen] = useState<TaskWithPeople | null>(null);
   const [creating, setCreating] = useState(false);
   const canAdd = Boolean(me && workflow);
-  const columnCount = showWorkflow ? 8 : 7;
+  const columnCount = showWorkflow ? 9 : 8;
 
   return (
     <>
@@ -50,6 +54,7 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
                 <th className="border-b border-ink-100 px-4 py-3 text-left">Workflow</th>
               )}
               <th className="border-b border-ink-100 px-4 py-3 text-left">Status</th>
+              <th className="border-b border-ink-100 px-4 py-3 text-left">Given by</th>
               <th className="border-b border-ink-100 px-4 py-3 text-left">Assignees</th>
               <th className="border-b border-ink-100 px-4 py-3 text-left">Difficulty</th>
               <th className="border-b border-ink-100 px-4 py-3 text-left">Due</th>
@@ -181,6 +186,9 @@ function TaskRow({
         />
       </td>
       <td className="px-4 py-3">
+        <AssignorDisplay task={task} />
+      </td>
+      <td className="px-4 py-3">
         <AssigneesDisplay task={task} onClick={onOpen} />
       </td>
       <td className="px-4 py-3">
@@ -291,6 +299,9 @@ function NewTaskRow({
       )}
       <td className="px-4 py-3">
         <StatusSelect value={status} onChange={setStatus} />
+      </td>
+      <td className="px-4 py-3 text-xs font-semibold text-ink-500">
+        You
       </td>
       <td className="px-4 py-3">
         <AssigneeSelect value={assignedTo} team={team} onChange={setAssignedTo} />
@@ -444,6 +455,18 @@ function AssigneeSelect({
   );
 }
 
+function AssignorDisplay({ task }: { task: TaskWithPeople }) {
+  const name = task.creator?.full_name ?? task.creator?.email.split("@")[0] ?? "Unknown";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Avatar profile={task.creator} size={24} />
+      <span className="max-w-24 truncate text-xs font-semibold text-ink-700">
+        {name}
+      </span>
+    </span>
+  );
+}
+
 function AssigneesDisplay({ task, onClick }: { task: TaskWithPeople; onClick: () => void }) {
   const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
   const firstName = assignees[0]?.full_name ?? assignees[0]?.email.split("@")[0];
@@ -484,7 +507,8 @@ function DueDate({
   value: string | null;
   onChange: (v: string | null) => void;
 }) {
-  const date = value ? parseISO(value) : null;
+  const inputValue = dateInCurrentYear(value ?? "");
+  const date = inputValue ? parseISO(inputValue) : null;
   let label = "Set date";
   let tone = "text-ink-400 hover:text-ink-700";
   if (date) {
@@ -508,12 +532,21 @@ function DueDate({
       {label}
       <input
         type="date"
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || null)}
+        value={inputValue}
+        min={MIN_DATE}
+        max={MAX_DATE}
+        onChange={(e) => onChange(dateInCurrentYear(e.target.value) || null)}
         className="absolute inset-0 cursor-pointer opacity-0"
       />
     </label>
   );
+}
+
+function dateInCurrentYear(value: string) {
+  if (!value) return "";
+  const [, month, day] = value.split("-");
+  if (!month || !day) return value;
+  return `${DATE_YEAR}-${month}-${day}`;
 }
 
 function Caret() {
