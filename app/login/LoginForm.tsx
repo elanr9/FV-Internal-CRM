@@ -5,38 +5,36 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 
-const EMAIL_BY_FIRST_NAME: Record<string, string> = {
-  elan: "founders@fieldvisionai.com",
-  fabri: "fabri@fieldvisionai.com",
-  isaac: "iad32@cornell.edu",
-  gaby: "gdiaz0618@uchicago.edu",
-  gabe: "gdiaz0618@uchicago.edu",
-  tona: "tonasanchezboss@gmail.com",
-  sebas: "sebasdlc704@gmail.com",
-  trav: "danielguerrero0803@gmail.com"
-};
-
 export default function LoginForm() {
   const router = useRouter();
-  const [firstName, setFirstName] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
-
-  const email = EMAIL_BY_FIRST_NAME[firstName.trim().toLowerCase()];
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!firstName || !password) return;
-    if (!email) {
-      toast.error("Ask Elan to add your login");
+    if (!username || !password) return;
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
       return;
     }
 
     setLoading(true);
+    const accountRes = await fetch("/api/auth/team-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const account = await accountRes.json().catch(() => ({}));
+    if (!accountRes.ok || !account.email) {
+      setLoading(false);
+      toast.error(account.error ?? "Could not create account");
+      return;
+    }
+
     const supabase = getSupabaseBrowser();
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: account.email,
       password
     });
     setLoading(false);
@@ -48,43 +46,18 @@ export default function LoginForm() {
     router.refresh();
   }
 
-  async function onResetPassword() {
-    if (!firstName) {
-      toast.error("Enter your first name first");
-      return;
-    }
-    if (!email) {
-      toast.error("Ask Elan to add your login");
-      return;
-    }
-
-    setResetLoading(true);
-    const supabase = getSupabaseBrowser();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`
-    });
-    setResetLoading(false);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success("Check your email to set your password");
-  }
-
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <label className="block">
         <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">
-          First name
+          Username
         </span>
         <input
           type="text"
           required
           autoFocus
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           placeholder="Tona"
           className="input"
         />
@@ -103,18 +76,10 @@ export default function LoginForm() {
         />
       </label>
       <button type="submit" disabled={loading} className="btn-primary w-full">
-        {loading ? "Signing in..." : "Sign in"}
-      </button>
-      <button
-        type="button"
-        onClick={onResetPassword}
-        disabled={resetLoading}
-        className="w-full text-sm font-semibold text-brand-600 hover:text-brand-700 disabled:opacity-60"
-      >
-        {resetLoading ? "Sending email..." : "Create or change password"}
+        {loading ? "Signing in..." : "Create account or sign in"}
       </button>
       <p className="text-center text-xs text-ink-400">
-        Only invited teammates can sign in.
+        Use tona, fabri, isaac, sebas, lucho, gaby, trav, or elan.
       </p>
     </form>
   );
