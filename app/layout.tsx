@@ -3,7 +3,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FieldVision CRM",
+  title: "CRM",
   description: "Internal task and workflow management for the FieldVision AI team."
 };
 
