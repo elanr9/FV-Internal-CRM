@@ -33,10 +33,12 @@ const STATUS_LABEL_SHORT: Record<Status, string> = {
 export default function TaskCard({
   task,
   profileId,
+  hideWorkflowDot,
   onClick
 }: {
   task: TaskWithPeople;
   profileId?: string;
+  hideWorkflowDot?: boolean;
   onClick: () => void;
 }) {
   const visibleStatus = profileId ? task.assignee_statuses?.[profileId] ?? task.status : task.status;
@@ -47,11 +49,14 @@ export default function TaskCard({
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="group flex w-full flex-col items-stretch rounded-2xl border border-ink-100 bg-white p-3 text-left shadow-card transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-pop"
+      className="group flex w-full min-h-[72px] flex-col items-stretch rounded-2xl border border-ink-100 bg-white p-4 text-left shadow-card transition touch-manipulation active:scale-[0.99] md:min-h-0 md:p-3 md:active:scale-100 md:hover:-translate-y-0.5 md:hover:border-brand-300 md:hover:shadow-pop"
     >
       <div className="flex items-start gap-2">
-        <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", WORKFLOW_DOT[task.workflow])} />
+        {!hideWorkflowDot && (
+          <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", WORKFLOW_DOT[task.workflow])} />
+        )}
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-sm font-semibold text-ink-900 group-hover:text-brand-700">
             {task.title}

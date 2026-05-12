@@ -5,6 +5,9 @@ import BoardView from "@/components/BoardView";
 
 export const dynamic = "force-dynamic";
 
+/** Matches login / notify mapping so the Trav board lists every task Trav is on, not only workflow trav */
+const TRAV_PROFILE_EMAIL = "danielguerrero0803@gmail.com";
+
 export default async function BoardPage({ params }: { params: { workflow: string } }) {
   const workflow = params.workflow as Workflow;
   if (!WORKFLOWS.includes(workflow)) notFound();
@@ -14,15 +17,38 @@ export default async function BoardPage({ params }: { params: { workflow: string
     data: { user }
   } = await supabase.auth.getUser();
 
-  const [{ data: tasks }, { data: profiles }] = await Promise.all([
+  const profilesQuery = supabase.from("profiles").select("id, email, full_name, avatar_url, role");
+  const baseTasksQuery = () =>
     supabase
       .from("tasks")
       .select("*")
-      .eq("workflow", workflow)
       .order("position", { ascending: true })
-      .order("created_at", { ascending: false }),
-    supabase.from("profiles").select("id, email, full_name, avatar_url, role")
-  ]);
+      .order("created_at", { ascending: false });
+
+  let tasks: Task[] | null;
+  let profiles;
+
+  if (workflow === "trav") {
+    const profilesRes = await profilesQuery;
+    profiles = profilesRes.data;
+    const teamEarly = (profiles as Profile[]) ?? [];
+    const travUserId = teamEarly.find((p) => p.email === TRAV_PROFILE_EMAIL)?.id;
+    let q = baseTasksQuery();
+    if (travUserId) {
+      q = q.or(`workflow.eq.trav,assigned_to.eq.${travUserId},assignee_ids.cs.{${travUserId}}`);
+    } else {
+      q = q.eq("workflow", workflow);
+    }
+    const tasksRes = await q;
+    tasks = tasksRes.data as Task[] | null;
+  } else {
+    const [tasksRes, profilesRes] = await Promise.all([
+      baseTasksQuery().eq("workflow", workflow),
+      profilesQuery
+    ]);
+    tasks = tasksRes.data as Task[] | null;
+    profiles = profilesRes.data;
+  }
 
   const team = (profiles as Profile[]) ?? [];
   const profileById = new Map(team.map((p) => [p.id, p]));

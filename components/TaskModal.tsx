@@ -264,19 +264,24 @@ export default function TaskModal(props: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-pop">
-        <header className="flex items-center justify-between border-b border-ink-100 px-6 py-4">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-ink-900/40 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm md:items-center md:p-4">
+      <div className="max-h-[90dvh] w-full max-w-3xl overflow-hidden rounded-t-3xl bg-white shadow-pop md:max-h-[calc(100vh-2rem)] md:rounded-3xl">
+        <header className="flex items-center justify-between border-b border-ink-100 px-4 py-3 md:px-6 md:py-4">
           <div className="text-sm font-semibold text-ink-400">
             {isEdit ? (isFeatureIdea ? "Edit idea" : "Edit task") : isFeatureIdea ? "New idea" : "New task"}
           </div>
-          <button onClick={props.onClose} className="rounded-full p-1.5 hover:bg-ink-100">
-            <X className="h-4 w-4 text-ink-500" />
+          <button
+            type="button"
+            onClick={props.onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ink-100 touch-manipulation"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5 text-ink-500" />
           </button>
         </header>
 
-        <div className="grid max-h-[calc(100vh-200px)] grid-cols-1 overflow-y-auto md:grid-cols-[1fr_280px]">
-          <div className="space-y-5 px-6 py-5">
+        <div className="grid max-h-[85dvh] grid-cols-1 overflow-y-auto overscroll-contain pb-2 md:max-h-[calc(100vh-200px)] md:grid-cols-[1fr_280px] md:pb-0">
+          <div className="space-y-5 px-4 py-4 md:px-6 md:py-5">
             <input
               autoFocus={!engineeringViewOnly}
               value={title}
@@ -448,7 +453,7 @@ export default function TaskModal(props: Props) {
             )}
           </div>
 
-          <aside className="space-y-4 border-t border-ink-100 bg-ink-50/40 px-6 py-5 md:border-l md:border-t-0">
+          <aside className="space-y-4 border-t border-ink-100 bg-ink-50/40 px-4 py-4 md:border-l md:border-t-0 md:px-6 md:py-5">
             <Field label="Workflow">
               <select
                 value={workflow}

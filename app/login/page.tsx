@@ -2,13 +2,13 @@ import LoginForm from "./LoginForm";
 
 export default function LoginPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white">
+    <div className="relative min-h-[100dvh] overflow-hidden bg-white">
       <div className="absolute inset-0 -z-10">
         <div className="absolute -top-32 -right-32 h-[480px] w-[480px] rounded-full bg-brand-100 blur-3xl opacity-70" />
         <div className="absolute -bottom-40 -left-32 h-[520px] w-[520px] rounded-full bg-brand-200 blur-3xl opacity-50" />
       </div>
 
-      <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6 py-16">
+      <div className="mx-auto flex min-h-[100dvh] max-w-6xl items-center justify-center px-6 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] pt-[calc(4rem+env(safe-area-inset-top,0px))]">
         <div className="grid w-full grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="flex flex-col justify-center">
             <div className="flex items-center gap-2 text-brand-600">

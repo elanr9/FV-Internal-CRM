@@ -63,13 +63,13 @@ export default function TeamWeekView({ me, team, tasks, weekStart }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b border-ink-100 bg-white px-8 pt-7 pb-5">
+      <header className="border-b border-ink-100 bg-white px-4 pb-4 pt-4 md:px-8 md:pb-5 md:pt-7">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-brand-700 text-white shadow-card">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-brand-700 text-white shadow-card">
             <Users className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-900">Team week</h1>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight text-ink-900 md:text-2xl">Team week</h1>
             <p className="text-sm text-ink-400">
               {format(days[0], "MMM d")} to {format(days[6], "MMM d, yyyy")}
             </p>
@@ -77,8 +77,9 @@ export default function TeamWeekView({ me, team, tasks, weekStart }: Props) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto px-8 py-6">
-        <div className="mx-auto min-w-[1100px] max-w-[1500px] space-y-4">
+      <div className="flex-1 overflow-auto px-0 py-4 md:px-8 md:py-6">
+        <div className="overflow-x-auto px-4 md:overflow-visible md:px-0">
+          <div className="mx-auto min-w-[1100px] max-w-[1500px] space-y-4">
           <div className="grid grid-cols-[220px_repeat(7,minmax(120px,1fr))] gap-3">
             <div />
             {days.map((day) => {
@@ -144,6 +145,7 @@ export default function TeamWeekView({ me, team, tasks, weekStart }: Props) {
               </div>
             );
           })}
+        </div>
         </div>
       </div>
 

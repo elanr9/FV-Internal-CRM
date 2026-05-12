@@ -80,13 +80,15 @@ export default function BoardView({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b border-ink-100 bg-white px-8 pt-7 pb-5">
+      <header
+        className="border-b border-ink-100 bg-white px-4 pb-4 pt-4 md:px-8 md:pb-5 md:pt-7"
+      >
         <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-card ${WORKFLOW_ACCENT[workflow]}`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-card ${WORKFLOW_ACCENT[workflow]}`}>
             <Icon className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-900">{title}</h1>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight text-ink-900 md:text-2xl">{title}</h1>
             <p className="text-sm text-ink-400">
               {tasks.length} {workflow === "feature_ideas" ? "idea" : "task"}
               {tasks.length === 1 ? "" : "s"} {isIdeaList ? "in the list" : "across this workflow"}
@@ -94,14 +96,14 @@ export default function BoardView({
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <div className="relative">
+        <div className="mt-4 flex flex-col gap-2 md:mt-5 md:flex-row md:flex-wrap md:items-center">
+          <div className="relative w-full md:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={isIdeaList ? "Search ideas" : "Search tasks"}
-              className="input w-72 pl-9"
+              className="input w-full pl-9"
             />
           </div>
 
@@ -109,7 +111,7 @@ export default function BoardView({
             <select
               value={assigneeFilter}
               onChange={(e) => setAssigneeFilter(e.target.value as FilterAssignee)}
-              className="input w-auto"
+              className="input min-h-[44px] w-full md:h-auto md:w-auto"
             >
               <option value="all">All people</option>
               <option value="unassigned">Unassigned</option>
@@ -125,7 +127,7 @@ export default function BoardView({
             <select
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value as FilterDifficulty)}
-              className="input w-auto"
+              className="input min-h-[44px] w-full md:h-auto md:w-auto"
             >
               <option value="all">All difficulty</option>
               <option value="easy">Easy</option>
@@ -137,8 +139,8 @@ export default function BoardView({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="mx-auto max-w-[1400px] space-y-8">
+      <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+        <div className="mx-auto max-w-[1400px] space-y-6 md:space-y-8">
           {isIdeaList ? (
             <TaskTable
               tasks={filtered}

@@ -30,6 +30,16 @@
   .card {
     @apply rounded-2xl border border-ink-100 bg-white shadow-card;
   }
+
+  [data-sonner-toaster][data-y-position="top"] {
+    top: max(0.75rem, env(safe-area-inset-top, 0px)) !important;
+  }
+}
+
+@layer utilities {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
