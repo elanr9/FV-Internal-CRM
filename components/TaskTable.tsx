@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, isToday, isTomorrow, isPast, parseISO } from "date-fns";
 import clsx from "clsx";
 import {
@@ -24,7 +24,7 @@ import { canEditEngineeringBoard } from "@/lib/engineering-board";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Calendar, Paperclip, Plus } from "lucide-react";
+import { Calendar, Paperclip, Plus, Users, X } from "lucide-react";
 
 const DATE_YEAR = "2026";
 const MIN_DATE = `${DATE_YEAR}-01-01`;
@@ -267,8 +267,15 @@ function TaskRow({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  async function patch(fields: Partial<TaskWithPeople>, successMessage?: string) {
+  async function patch(fields: Partial<TaskWithPeople>, successMessage?: string, force?: boolean) {
     if (engineeringReadOnly) return;
+    if (!force && !canManageTaskFields) {
+      const keys = Object.keys(fields);
+      const onlyAssigneeProgress =
+        keys.length > 0 &&
+        keys.every((k) => k === "assignee_statuses" || k === "status");
+      if (!onlyAssigneeProgress) return;
+    }
     setBusy(true);
     const supabase = getSupabaseBrowser();
     const { error } = await supabase.from("tasks").update(fields).eq("id", task.id);
@@ -292,7 +299,8 @@ function TaskRow({
         assignee_statuses: {},
         due_date: null
       },
-      "Idea added to engineering backlog"
+      "Idea added to engineering backlog",
+      true
     );
   }
 
@@ -314,6 +322,7 @@ function TaskRow({
   const due = task.due_date ? parseISO(task.due_date) : null;
   const hasAttachments = task.images.length > 0;
   const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
+  const canManageTaskFields = Boolean(me && task.created_by === me.id);
 
   if (ideaList) {
     return (
@@ -407,6 +416,7 @@ function TaskRow({
           onTaskStatusChange={(status) => patch({ status })}
           onAssigneeStatusChange={patchAssigneeStatus}
           readOnly={Boolean(engineeringReadOnly)}
+          canManageTaskFields={canManageTaskFields}
         />
       </td>
       <td className="px-4 py-3">
@@ -416,7 +426,7 @@ function TaskRow({
         <AssigneesDisplay task={task} onClick={onOpen} />
       </td>
       <td className="px-4 py-3">
-        {engineeringReadOnly ? (
+        {engineeringReadOnly || !canManageTaskFields ? (
           <DifficultyReadOnly value={task.difficulty} />
         ) : (
           <DifficultySelect
@@ -426,7 +436,7 @@ function TaskRow({
         )}
       </td>
       <td className="px-4 py-3">
-        {engineeringReadOnly ? (
+        {engineeringReadOnly || !canManageTaskFields ? (
           <DueDateReadOnly value={task.due_date} />
         ) : (
           <DueDate
@@ -442,6 +452,35 @@ function TaskRow({
   );
 }
 
+function AssigneeProgressRow({
+  profile,
+  status,
+  readOnly,
+  isEditor,
+  onAssigneeStatusChange
+}: {
+  profile: Profile;
+  status: Status;
+  readOnly: boolean;
+  isEditor: boolean;
+  onAssigneeStatusChange: (profileId: string, status: Status) => void;
+}) {
+  const name = profile.full_name ?? profile.email.split("@")[0];
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar profile={profile} size={22} />
+      <span className="max-w-20 truncate text-xs font-semibold text-ink-600">{name}</span>
+      {readOnly ? (
+        <StatusBadge status={status} />
+      ) : isEditor ? (
+        <StatusSelect value={status} onChange={(next) => onAssigneeStatusChange(profile.id, next)} />
+      ) : (
+        <StatusBadge status={status} />
+      )}
+    </div>
+  );
+}
+
 function ProgressCell({
   assignees,
   me,
@@ -449,7 +488,8 @@ function ProgressCell({
   getStatus,
   onTaskStatusChange,
   onAssigneeStatusChange,
-  readOnly
+  readOnly,
+  canManageTaskFields
 }: {
   assignees: Profile[];
   me: Profile | null;
@@ -458,34 +498,115 @@ function ProgressCell({
   onTaskStatusChange: (status: Status) => void;
   onAssigneeStatusChange: (profileId: string, status: Status) => void;
   readOnly?: boolean;
+  canManageTaskFields: boolean;
 }) {
+  const [everyoneOpen, setEveryoneOpen] = useState(false);
+
+  useEffect(() => {
+    if (!everyoneOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setEveryoneOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [everyoneOpen]);
+
   if (assignees.length === 0) {
-    return readOnly ? (
+    return readOnly || !canManageTaskFields ? (
       <StatusBadge status={taskStatus} />
     ) : (
       <StatusSelect value={taskStatus} onChange={onTaskStatusChange} />
     );
   }
 
+  const imAssigned = Boolean(me && assignees.some((p) => p.id === me.id));
+  const showOnlyMine = imAssigned && assignees.length > 1;
+
+  if (showOnlyMine && me) {
+    const myProfile = assignees.find((p) => p.id === me.id)!;
+    const status = getStatus(myProfile.id);
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <AssigneeProgressRow
+            profile={myProfile}
+            status={status}
+            readOnly={Boolean(readOnly)}
+            isEditor={!readOnly}
+            onAssigneeStatusChange={onAssigneeStatusChange}
+          />
+          <button
+            type="button"
+            title="Everyone on this task"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEveryoneOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-ink-200 bg-white px-2 py-1 text-[11px] font-semibold text-ink-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Everyone
+          </button>
+        </div>
+        {everyoneOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4 backdrop-blur-sm"
+            onClick={() => setEveryoneOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="assignee-status-all-title"
+              className="relative w-full max-w-sm rounded-2xl border border-ink-100 bg-white p-4 shadow-pop"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div>
+                  <h2 id="assignee-status-all-title" className="text-sm font-semibold text-ink-900">
+                    Everyone on this task
+                  </h2>
+                  <p className="mt-0.5 text-xs text-ink-500">Status per person</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEveryoneOpen(false)}
+                  className="rounded-lg p-1 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="max-h-[min(24rem,70vh)] space-y-1.5 overflow-y-auto pr-1">
+                {assignees.map((profile) => (
+                  <AssigneeProgressRow
+                    key={profile.id}
+                    profile={profile}
+                    status={getStatus(profile.id)}
+                    readOnly={Boolean(readOnly)}
+                    isEditor={!readOnly && me?.id === profile.id}
+                    onAssigneeStatusChange={onAssigneeStatusChange}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-1.5">
-      {assignees.map((profile) => {
-        const status = getStatus(profile.id);
-        const name = profile.full_name ?? profile.email.split("@")[0];
-        return (
-          <div key={profile.id} className="flex items-center gap-2">
-            <Avatar profile={profile} size={22} />
-            <span className="max-w-20 truncate text-xs font-semibold text-ink-600">{name}</span>
-            {readOnly ? (
-              <StatusBadge status={status} />
-            ) : me?.id === profile.id ? (
-              <StatusSelect value={status} onChange={(next) => onAssigneeStatusChange(profile.id, next)} />
-            ) : (
-              <StatusBadge status={status} />
-            )}
-          </div>
-        );
-      })}
+      {assignees.map((profile) => (
+        <AssigneeProgressRow
+          key={profile.id}
+          profile={profile}
+          status={getStatus(profile.id)}
+          readOnly={Boolean(readOnly)}
+          isEditor={!readOnly && me?.id === profile.id}
+          onAssigneeStatusChange={onAssigneeStatusChange}
+        />
+      ))}
     </div>
   );
 }

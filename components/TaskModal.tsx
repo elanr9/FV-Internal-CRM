@@ -20,7 +20,8 @@ import {
   type Status,
   type TaskComment,
   type TaskWithPeople,
-  type Workflow
+  type Workflow,
+  taskStatusAfterAssigneePatch
 } from "@/lib/types";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { canEditEngineeringBoard } from "@/lib/engineering-board";
@@ -59,6 +60,12 @@ export default function TaskModal(props: Props) {
   const initial = isEdit ? props.task : null;
   const engineeringViewOnly =
     isEdit && Boolean(initial?.workflow === "engineering" && !canEditEngineeringBoard(props.me));
+  const canManageTaskFields = Boolean(
+    !engineeringViewOnly &&
+      (!isEdit || (initial != null && initial.created_by === props.me.id))
+  );
+  const isGuestViewer = Boolean(isEdit && initial && !engineeringViewOnly && !canManageTaskFields);
+  const fieldsLocked = engineeringViewOnly || isGuestViewer;
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -132,7 +139,7 @@ export default function TaskModal(props: Props) {
   }, [props]);
 
   async function save() {
-    if (engineeringViewOnly) return;
+    if (!canManageTaskFields) return;
     if (!title.trim()) {
       toast.error(isFeatureIdea ? "Give the idea a title." : "Give the task a title.");
       return;
@@ -214,7 +221,7 @@ export default function TaskModal(props: Props) {
   }
 
   async function remove() {
-    if (!isEdit || !initial || engineeringViewOnly) return;
+    if (!isEdit || !initial || !canManageTaskFields) return;
     if (!confirm("Delete this task forever?")) return;
     setBusy(true);
     const { error } = await supabase.from("tasks").delete().eq("id", initial.id);
@@ -226,7 +233,7 @@ export default function TaskModal(props: Props) {
   }
 
   async function uploadFiles(files: FileList | null) {
-    if (!files || files.length === 0 || engineeringViewOnly) return;
+    if (!files || files.length === 0 || fieldsLocked || !canManageTaskFields) return;
     setUploading(true);
     const next: string[] = [];
     for (const file of Array.from(files)) {
@@ -267,12 +274,52 @@ export default function TaskModal(props: Props) {
     notify({ kind: "comment_posted", taskId: initial.id, commentBody: body });
   }
 
+  async function updateMyAssigneeStatus(next: Status) {
+    if (!isEdit || !initial || !isGuestViewer) return;
+    const myId = props.me.id;
+    if (!assigneeIds.includes(myId)) return;
+    setBusy(true);
+    const nextAssigneeStatuses = { ...assigneeStatuses, [myId]: next };
+    const rolledUp = taskStatusAfterAssigneePatch(initial, nextAssigneeStatuses);
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        assignee_statuses: nextAssigneeStatuses,
+        status: rolledUp
+      })
+      .eq("id", initial.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    setAssigneeStatuses(nextAssigneeStatuses);
+    setStatus(rolledUp);
+    toast.success("Status updated");
+    router.refresh();
+  }
+
+  const guestDueLabel =
+    initial?.due_date != null
+      ? format(parseISO(initial.due_date), "MMMM d, yyyy")
+      : null;
+  const myAssigneeStatus = assigneeIds.includes(props.me.id)
+    ? assigneeStatuses[props.me.id] ?? status
+    : null;
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-ink-900/40 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm md:items-center md:p-4">
       <div className="max-h-[90dvh] w-full max-w-3xl overflow-hidden rounded-t-3xl bg-white shadow-pop md:max-h-[calc(100vh-2rem)] md:rounded-3xl">
         <header className="flex items-center justify-between border-b border-ink-100 px-4 py-3 md:px-6 md:py-4">
           <div className="text-sm font-semibold text-ink-400">
-            {isEdit ? (isFeatureIdea ? "Edit idea" : "Edit task") : isFeatureIdea ? "New idea" : "New task"}
+            {isEdit
+              ? isGuestViewer
+                ? isFeatureIdea
+                  ? "Idea"
+                  : "Task"
+                : isFeatureIdea
+                  ? "Edit idea"
+                  : "Edit task"
+              : isFeatureIdea
+                ? "New idea"
+                : "New task"}
           </div>
           <button
             type="button"
@@ -284,13 +331,169 @@ export default function TaskModal(props: Props) {
           </button>
         </header>
 
-        <div className="grid max-h-[85dvh] grid-cols-1 overflow-y-auto overscroll-contain pb-2 md:max-h-[calc(100vh-200px)] md:grid-cols-[1fr_280px] md:pb-0">
-          <div className="space-y-5 px-4 py-4 md:px-6 md:py-5">
+        <div
+          className={clsx(
+            "max-h-[85dvh] overflow-y-auto overscroll-contain pb-2 md:max-h-[calc(100vh-200px)] md:pb-0",
+            !isGuestViewer && "grid grid-cols-1 md:grid-cols-[1fr_280px]"
+          )}
+        >
+          {isGuestViewer && initial ? (
+            <div className="space-y-6 px-4 py-5 md:px-8">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-ink-900">{initial.title}</h2>
+                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-600">
+                  <span className="inline-flex items-center gap-2">
+                    <Avatar profile={initial.creator} size={22} />
+                    <span>
+                      From{" "}
+                      <span className="font-semibold text-ink-900">
+                        {initial.creator?.full_name ?? initial.creator?.email ?? "Unknown"}
+                      </span>
+                    </span>
+                  </span>
+                  {guestDueLabel && (
+                    <span>
+                      <span className="text-ink-400">Due</span>{" "}
+                      <span className="font-semibold text-ink-900">{guestDueLabel}</span>
+                    </span>
+                  )}
+                  <span>
+                    <span className="text-ink-400">Difficulty</span>{" "}
+                    <span className="font-semibold text-ink-900">{DIFFICULTY_LABEL[initial.difficulty]}</span>
+                  </span>
+                </div>
+              </div>
+
+              {myAssigneeStatus != null && (
+                <div>
+                  <SectionLabel>Your status</SectionLabel>
+                  <select
+                    value={myAssigneeStatus}
+                    onChange={(e) => updateMyAssigneeStatus(e.target.value as Status)}
+                    disabled={busy}
+                    className="input max-w-xs disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <SectionLabel>What to do</SectionLabel>
+                {description.trim() ? (
+                  <p className="whitespace-pre-wrap text-base leading-relaxed text-ink-800">{description}</p>
+                ) : (
+                  <p className="text-sm text-ink-400">No details were added. Check links below or ask the person who assigned this.</p>
+                )}
+              </div>
+
+              {(normalizeHttpUrl(callUrl) || normalizeHttpUrl(sheetsUrl)) && (
+                <div className="flex flex-wrap gap-3">
+                  {normalizeHttpUrl(callUrl) && (
+                    <a
+                      href={normalizeHttpUrl(callUrl) ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open call link
+                    </a>
+                  )}
+                  {normalizeHttpUrl(sheetsUrl) && (
+                    <a
+                      href={normalizeHttpUrl(sheetsUrl) ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open sheet
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {images.length > 0 && (
+                <div>
+                  <SectionLabel>Attachments</SectionLabel>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {images.map((url) => (
+                      <div
+                        key={url}
+                        className="aspect-square overflow-hidden rounded-xl border border-ink-100 bg-ink-50"
+                      >
+                        <img src={url} alt="attachment" className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <SectionLabel>Comments</SectionLabel>
+                <p className="mb-3 text-xs text-ink-400">Comments email the task owner and assignees.</p>
+                <div className="space-y-3">
+                  {comments.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-ink-200 px-3 py-4 text-center text-xs text-ink-400">
+                      No comments yet. Be the first to add one.
+                    </div>
+                  )}
+                  {comments.map((c) => (
+                    <div key={c.id} className="flex gap-3">
+                      <Avatar profile={c.author} size={30} />
+                      <div className="flex-1 rounded-xl bg-ink-50 px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-semibold text-ink-900">
+                            {c.author?.full_name ?? c.author?.email ?? "Teammate"}
+                          </div>
+                          <div className="text-[11px] text-ink-400">
+                            {formatDistanceToNow(parseISO(c.created_at), { addSuffix: true })}
+                          </div>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{c.body}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Avatar profile={props.me} size={30} />
+                    <div className="flex flex-1 items-center gap-2">
+                      <input
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            postComment();
+                          }
+                        }}
+                        placeholder="Write a comment..."
+                        className="input"
+                      />
+                      <button
+                        onClick={postComment}
+                        disabled={postingComment || !newComment.trim()}
+                        className="btn-primary px-3 py-2"
+                      >
+                        {postingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-5 px-4 py-4 md:px-6 md:py-5">
             <input
-              autoFocus={!engineeringViewOnly}
+              autoFocus={!fieldsLocked}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              readOnly={engineeringViewOnly}
+              readOnly={fieldsLocked}
               placeholder={isFeatureIdea ? "What should we build?" : "What needs to be done?"}
               className="w-full bg-transparent text-2xl font-bold tracking-tight text-ink-900 placeholder-ink-300 outline-none read-only:text-ink-700 read-only:pointer-events-none"
             />
@@ -298,7 +501,7 @@ export default function TaskModal(props: Props) {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              readOnly={engineeringViewOnly}
+              readOnly={fieldsLocked}
               placeholder={
                 isFeatureIdea
                   ? "Add context, impact, links, or examples..."
@@ -314,7 +517,7 @@ export default function TaskModal(props: Props) {
                 type="url"
                 value={callUrl}
                 onChange={(e) => setCallUrl(e.target.value)}
-                readOnly={engineeringViewOnly}
+                readOnly={fieldsLocked}
                 placeholder="Google Calendar or Zoom link"
                 className="input read-only:pointer-events-none"
               />
@@ -337,7 +540,7 @@ export default function TaskModal(props: Props) {
                 type="url"
                 value={sheetsUrl}
                 onChange={(e) => setSheetsUrl(e.target.value)}
-                readOnly={engineeringViewOnly}
+                readOnly={fieldsLocked}
                 placeholder="Google Sheets link for the team"
                 className="input read-only:pointer-events-none"
               />
@@ -363,7 +566,7 @@ export default function TaskModal(props: Props) {
                     className="group relative aspect-square overflow-hidden rounded-xl border border-ink-100 bg-ink-50"
                   >
                     <img src={url} alt="attachment" className="h-full w-full object-cover" />
-                    {!engineeringViewOnly && (
+                    {canManageTaskFields && (
                       <button
                         onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
                         className="absolute right-1 top-1 rounded-full bg-ink-900/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
@@ -373,7 +576,7 @@ export default function TaskModal(props: Props) {
                     )}
                   </div>
                 ))}
-                {!engineeringViewOnly && (
+                {canManageTaskFields && (
                   <>
                     <button
                       type="button"
@@ -462,7 +665,7 @@ export default function TaskModal(props: Props) {
               <select
                 value={workflow}
                 onChange={(e) => setWorkflow(e.target.value as Workflow)}
-                disabled={engineeringViewOnly}
+                disabled={fieldsLocked}
                 className="input disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {WORKFLOWS.filter(
@@ -482,7 +685,7 @@ export default function TaskModal(props: Props) {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as Status)}
-                disabled={engineeringViewOnly}
+                disabled={fieldsLocked}
                 className="input disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {STATUSES.map((s) => (
@@ -497,7 +700,7 @@ export default function TaskModal(props: Props) {
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                disabled={engineeringViewOnly}
+                disabled={fieldsLocked}
                 className="input disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {DIFFICULTIES.map((d) => (
@@ -516,14 +719,14 @@ export default function TaskModal(props: Props) {
                     key={p.id}
                     className={clsx(
                       "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink-700",
-                      engineeringViewOnly ? "cursor-default opacity-80" : "cursor-pointer hover:bg-ink-50"
+                      fieldsLocked ? "cursor-default opacity-80" : "cursor-pointer hover:bg-ink-50"
                     )}
                   >
                     <input
                       type="checkbox"
                       checked={assigneeIds.includes(p.id)}
                       onChange={() => toggleAssignee(p.id)}
-                      disabled={engineeringViewOnly}
+                      disabled={fieldsLocked}
                       className="h-4 w-4 rounded border-ink-300 text-brand-600 disabled:cursor-not-allowed"
                     />
                     <Avatar profile={p} size={24} />
@@ -549,7 +752,7 @@ export default function TaskModal(props: Props) {
                         <span className="min-w-0 flex-1 truncate text-sm text-ink-700">
                           {profile?.full_name ?? profile?.email ?? "Teammate"}
                         </span>
-                        {props.me.id === id && !engineeringViewOnly ? (
+                        {props.me.id === id && !fieldsLocked ? (
                           <select
                             value={currentStatus}
                             onChange={(e) => setAssigneeStatus(id, e.target.value as Status)}
@@ -583,7 +786,7 @@ export default function TaskModal(props: Props) {
                     <button
                       key={value}
                       type="button"
-                      disabled={engineeringViewOnly}
+                      disabled={fieldsLocked}
                       onClick={() => setDueDate(selected ? "" : value)}
                       title={format(day, "EEEE, MMMM d")}
                       className={clsx(
@@ -610,7 +813,7 @@ export default function TaskModal(props: Props) {
                 !upcomingWeekDays.some(
                   (d) => dateInCurrentYear(format(d, "yyyy-MM-dd")) === dueDate
                 ) &&
-                !engineeringViewOnly && (
+                !fieldsLocked && (
                   <p className="mt-2 text-[11px] text-ink-400">
                     Due date is outside this week. Pick a day above or save to keep it.
                   </p>
@@ -634,11 +837,13 @@ export default function TaskModal(props: Props) {
               </div>
             )}
           </aside>
+            </>
+          )}
         </div>
 
         <footer className="flex items-center justify-between border-t border-ink-100 bg-white px-6 py-3.5">
           <div>
-            {isEdit && !engineeringViewOnly && (
+            {isEdit && canManageTaskFields && (
               <button onClick={remove} className="btn-ghost text-rose-600 hover:bg-rose-50">
                 <Trash2 className="h-4 w-4" />
                 Delete
@@ -647,9 +852,9 @@ export default function TaskModal(props: Props) {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={props.onClose} className="btn-secondary">
-              {engineeringViewOnly ? "Close" : "Cancel"}
+              {engineeringViewOnly || isGuestViewer ? "Close" : "Cancel"}
             </button>
-            {!engineeringViewOnly && (
+            {canManageTaskFields && (
               <button onClick={save} disabled={busy} className="btn-primary">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {isEdit ? "Save changes" : "Create task"}
