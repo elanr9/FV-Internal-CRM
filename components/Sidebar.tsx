@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Code2, Lightbulb, Sparkles, Video, User, LogOut, Calendar, ShieldAlert, Users } from "lucide-react";
+import { Code2, Compass, Lightbulb, Sparkles, Video, User, LogOut, Calendar, ShieldAlert, Users } from "lucide-react";
 import clsx from "clsx";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
@@ -49,15 +49,13 @@ export default function Sidebar({ me, team }: Props) {
       <nav className="mt-6 flex-1 overflow-y-auto px-3 pb-2">
         <SectionLabel>Workflows</SectionLabel>
         <ul className="space-y-0.5">
-          {isAdmin && (
-            <SidebarLink
-              href="/board/engineering"
-              label="Engineering"
-              icon={Code2}
-              accent="text-brand-600"
-              active={pathname?.startsWith("/board/engineering") ?? false}
-            />
-          )}
+          <SidebarLink
+            href="/board/engineering"
+            label="Engineering"
+            icon={Code2}
+            accent="text-brand-600"
+            active={pathname?.startsWith("/board/engineering") ?? false}
+          />
           <SidebarLink
             href="/board/growth"
             label="Growth"
@@ -71,6 +69,13 @@ export default function Sidebar({ me, team }: Props) {
             icon={Video}
             accent="text-fuchsia-600"
             active={pathname?.startsWith("/board/content") ?? false}
+          />
+          <SidebarLink
+            href="/board/trav"
+            label="Trav"
+            icon={Compass}
+            accent="text-orange-600"
+            active={pathname?.startsWith("/board/trav") ?? false}
           />
         </ul>
 

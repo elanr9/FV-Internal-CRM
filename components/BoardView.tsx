@@ -1,6 +1,6 @@
 "use client";
 
-import { Code2, Lightbulb, Search, Sparkles, Video } from "lucide-react";
+import { Code2, Compass, Lightbulb, Search, Sparkles, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type Difficulty,
@@ -17,6 +17,7 @@ const WORKFLOW_ICON = {
   engineering: Code2,
   growth: Sparkles,
   content: Video,
+  trav: Compass,
   feature_ideas: Lightbulb
 } as const;
 
@@ -24,6 +25,7 @@ const WORKFLOW_ACCENT: Record<Workflow, string> = {
   engineering: "from-brand-500 to-brand-700",
   growth: "from-emerald-500 to-emerald-700",
   content: "from-fuchsia-500 to-fuchsia-700",
+  trav: "from-orange-500 to-orange-700",
   feature_ideas: "from-amber-500 to-amber-700"
 };
 

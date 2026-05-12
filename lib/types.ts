@@ -1,4 +1,4 @@
-export type Workflow = "engineering" | "growth" | "content" | "feature_ideas";
+export type Workflow = "engineering" | "growth" | "content" | "trav" | "feature_ideas";
 export type Status = "backlog" | "todo" | "in_progress" | "in_review" | "done";
 export type Difficulty = "easy" | "medium" | "hard" | "epic";
 export type Role = "member" | "admin";
@@ -21,6 +21,7 @@ export type Task = {
   difficulty: Difficulty;
   due_date: string | null;
   call_url: string | null;
+  sheets_url: string | null;
   position: number;
   created_by: string;
   assigned_to: string | null;
@@ -47,12 +48,13 @@ export type TaskComment = {
   author: Profile | null;
 };
 
-export const WORKFLOWS: Workflow[] = ["engineering", "growth", "content", "feature_ideas"];
+export const WORKFLOWS: Workflow[] = ["engineering", "growth", "content", "trav", "feature_ideas"];
 
 export const WORKFLOW_LABEL: Record<Workflow, string> = {
   engineering: "Engineering",
   growth: "Growth",
   content: "Content",
+  trav: "Trav",
   feature_ideas: "Feature Ideas"
 };
 

@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { WORKFLOWS, WORKFLOW_LABEL, type Profile, type Task, type TaskWithPeople, type Workflow } from "@/lib/types";
 import BoardView from "@/components/BoardView";
@@ -13,17 +13,6 @@ export default async function BoardPage({ params }: { params: { workflow: string
   const {
     data: { user }
   } = await supabase.auth.getUser();
-
-  if (workflow === "engineering") {
-    const { data: meProfile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user?.id ?? "")
-      .maybeSingle();
-    if (!meProfile || meProfile.role !== "admin") {
-      redirect("/me/week");
-    }
-  }
 
   const [{ data: tasks }, { data: profiles }] = await Promise.all([
     supabase

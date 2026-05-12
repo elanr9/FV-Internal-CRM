@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { addDays, format, isToday, parseISO } from "date-fns";
-import { Calendar as CalIcon, Inbox, Plus, Video } from "lucide-react";
+import { Calendar as CalIcon, FileSpreadsheet, Inbox, Plus, Video } from "lucide-react";
 import type { DailyNote, Profile, TaskWithPeople } from "@/lib/types";
 import DailyNotes from "./DailyNotes";
 import TaskCard from "./TaskCard";
@@ -177,13 +177,18 @@ export default function WeekView({ me, team, tasks, notes, weekStart }: Props) {
                                   "h-1.5 w-1.5 shrink-0 rounded-full",
                                   t.workflow === "engineering" && "bg-brand-500",
                                   t.workflow === "growth" && "bg-emerald-500",
-                                  t.workflow === "content" && "bg-fuchsia-500"
+                                  t.workflow === "content" && "bg-fuchsia-500",
+                                  t.workflow === "trav" && "bg-orange-500",
+                                  t.workflow === "feature_ideas" && "bg-amber-500"
                                 )}
                               />
                               <span className="line-clamp-1 text-xs font-medium text-ink-900">
                                 {t.title}
                               </span>
                               {t.call_url && <Video className="h-3 w-3 shrink-0 text-brand-600" />}
+                              {t.sheets_url && (
+                                <FileSpreadsheet className="h-3 w-3 shrink-0 text-emerald-600" />
+                              )}
                             </div>
                           </button>
                         ))

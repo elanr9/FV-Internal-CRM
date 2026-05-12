@@ -17,6 +17,7 @@ import {
 } from "@/lib/types";
 import Avatar, { profileColor } from "./Avatar";
 import TaskModal from "./TaskModal";
+import { canEditEngineeringBoard } from "@/lib/engineering-board";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -39,7 +40,9 @@ type Props = {
 export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "todo", emptyHint, showWorkflow }: Props) {
   const [open, setOpen] = useState<TaskWithPeople | null>(null);
   const [creating, setCreating] = useState(false);
-  const canAdd = Boolean(me && workflow);
+  const canAdd =
+    Boolean(me && workflow) &&
+    (workflow !== "engineering" || canEditEngineeringBoard(me));
   const isIdeaList = workflow === "feature_ideas" && !showWorkflow;
   const columnCount = isIdeaList ? 5 : showWorkflow ? 9 : 8;
 
@@ -79,6 +82,10 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
                 showWorkflow={showWorkflow}
                 ideaList={isIdeaList}
                 onOpen={() => setOpen(task)}
+                engineeringReadOnly={
+                  task.workflow === "engineering" &&
+                  Boolean(me && !canEditEngineeringBoard(me))
+                }
               />
             ))}
             {canAdd && (
@@ -128,18 +135,21 @@ function TaskRow({
   me,
   showWorkflow,
   ideaList,
-  onOpen
+  onOpen,
+  engineeringReadOnly
 }: {
   task: TaskWithPeople;
   me: Profile | null;
   showWorkflow?: boolean;
   ideaList?: boolean;
   onOpen: () => void;
+  engineeringReadOnly?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function patch(fields: Partial<TaskWithPeople>, successMessage?: string) {
+    if (engineeringReadOnly) return;
     setBusy(true);
     const supabase = getSupabaseBrowser();
     const { error } = await supabase.from("tasks").update(fields).eq("id", task.id);
@@ -153,6 +163,7 @@ function TaskRow({
   }
 
   function addToEngineeringBacklog() {
+    if (!me || !canEditEngineeringBoard(me)) return;
     patch(
       {
         workflow: "engineering",
@@ -217,13 +228,17 @@ function TaskRow({
           {format(parseISO(task.created_at), "MMM d")}
         </td>
         <td className="px-4 py-3">
-          <button
-            onClick={addToEngineeringBacklog}
-            disabled={busy}
-            className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Add to engineering backlog
-          </button>
+          {me && canEditEngineeringBoard(me) ? (
+            <button
+              onClick={addToEngineeringBacklog}
+              disabled={busy}
+              className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Add to engineering backlog
+            </button>
+          ) : (
+            <span className="text-xs text-ink-400">Editors only</span>
+          )}
         </td>
       </tr>
     );
@@ -270,6 +285,7 @@ function TaskRow({
           getStatus={assigneeStatus}
           onTaskStatusChange={(status) => patch({ status })}
           onAssigneeStatusChange={patchAssigneeStatus}
+          readOnly={Boolean(engineeringReadOnly)}
         />
       </td>
       <td className="px-4 py-3">
@@ -279,16 +295,24 @@ function TaskRow({
         <AssigneesDisplay task={task} onClick={onOpen} />
       </td>
       <td className="px-4 py-3">
-        <DifficultySelect
-          value={task.difficulty}
-          onChange={(difficulty) => patch({ difficulty })}
-        />
+        {engineeringReadOnly ? (
+          <DifficultyReadOnly value={task.difficulty} />
+        ) : (
+          <DifficultySelect
+            value={task.difficulty}
+            onChange={(difficulty) => patch({ difficulty })}
+          />
+        )}
       </td>
       <td className="px-4 py-3">
-        <DueDate
-          value={task.due_date}
-          onChange={(due_date) => patch({ due_date })}
-        />
+        {engineeringReadOnly ? (
+          <DueDateReadOnly value={task.due_date} />
+        ) : (
+          <DueDate
+            value={task.due_date}
+            onChange={(due_date) => patch({ due_date })}
+          />
+        )}
       </td>
       <td className="px-4 py-3 text-xs text-ink-400">
         {format(parseISO(task.created_at), "MMM d")}
@@ -303,7 +327,8 @@ function ProgressCell({
   taskStatus,
   getStatus,
   onTaskStatusChange,
-  onAssigneeStatusChange
+  onAssigneeStatusChange,
+  readOnly
 }: {
   assignees: Profile[];
   me: Profile | null;
@@ -311,9 +336,14 @@ function ProgressCell({
   getStatus: (profileId: string) => Status;
   onTaskStatusChange: (status: Status) => void;
   onAssigneeStatusChange: (profileId: string, status: Status) => void;
+  readOnly?: boolean;
 }) {
   if (assignees.length === 0) {
-    return <StatusSelect value={taskStatus} onChange={onTaskStatusChange} />;
+    return readOnly ? (
+      <StatusBadge status={taskStatus} />
+    ) : (
+      <StatusSelect value={taskStatus} onChange={onTaskStatusChange} />
+    );
   }
 
   return (
@@ -325,7 +355,9 @@ function ProgressCell({
           <div key={profile.id} className="flex items-center gap-2">
             <Avatar profile={profile} size={22} />
             <span className="max-w-20 truncate text-xs font-semibold text-ink-600">{name}</span>
-            {me?.id === profile.id ? (
+            {readOnly ? (
+              <StatusBadge status={status} />
+            ) : me?.id === profile.id ? (
               <StatusSelect value={status} onChange={(next) => onAssigneeStatusChange(profile.id, next)} />
             ) : (
               <StatusBadge status={status} />
@@ -452,6 +484,7 @@ function WorkflowChip({ workflow }: { workflow: Workflow }) {
     engineering: "bg-brand-50 text-brand-700",
     growth: "bg-emerald-50 text-emerald-700",
     content: "bg-fuchsia-50 text-fuchsia-700",
+    trav: "bg-orange-50 text-orange-800",
     feature_ideas: "bg-amber-50 text-amber-700"
   };
   return (
@@ -523,6 +556,48 @@ function StatusBadge({ status }: { status: Status }) {
   return (
     <span className={clsx("rounded-full px-2.5 py-1 text-xs font-semibold", styles[status])}>
       {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function DifficultyReadOnly({ value }: { value: Difficulty }) {
+  const styles: Record<Difficulty, string> = {
+    easy: "bg-emerald-50 text-emerald-700",
+    medium: "bg-brand-50 text-brand-700",
+    hard: "bg-amber-50 text-amber-800",
+    epic: "bg-rose-50 text-rose-700"
+  };
+  return (
+    <span className={clsx("inline-flex rounded-full px-3 py-1 text-xs font-semibold", styles[value])}>
+      {DIFFICULTY_LABEL[value]}
+    </span>
+  );
+}
+
+function DueDateReadOnly({ value }: { value: string | null }) {
+  const inputValue = dateInCurrentYear(value ?? "");
+  const date = inputValue ? parseISO(inputValue) : null;
+  let label = "No date";
+  let tone = "text-ink-400";
+  if (date) {
+    if (isToday(date)) {
+      label = "Today";
+      tone = "text-amber-700 bg-amber-50 rounded-full px-2.5 py-1 font-semibold";
+    } else if (isTomorrow(date)) {
+      label = "Tomorrow";
+      tone = "text-brand-700 bg-brand-50 rounded-full px-2.5 py-1 font-semibold";
+    } else if (isPast(date)) {
+      label = format(date, "MMM d");
+      tone = "text-rose-700 bg-rose-50 rounded-full px-2.5 py-1 font-semibold";
+    } else {
+      label = format(date, "MMM d");
+      tone = "text-ink-700 bg-ink-50 rounded-full px-2.5 py-1 font-semibold";
+    }
+  }
+  return (
+    <span className={clsx("inline-flex items-center gap-1.5 text-xs font-semibold", tone)}>
+      <Calendar className="h-3.5 w-3.5" />
+      {label}
     </span>
   );
 }

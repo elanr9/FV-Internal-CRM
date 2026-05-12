@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { format, isPast, isToday, parseISO } from "date-fns";
-import { Calendar, Paperclip, Video } from "lucide-react";
+import { Calendar, FileSpreadsheet, Paperclip, Video } from "lucide-react";
 import type { Status, TaskWithPeople, Workflow } from "@/lib/types";
 import Avatar from "./Avatar";
 
@@ -10,6 +10,7 @@ const WORKFLOW_DOT: Record<Workflow, string> = {
   engineering: "bg-brand-500",
   growth: "bg-emerald-500",
   content: "bg-fuchsia-500",
+  trav: "bg-orange-500",
   feature_ideas: "bg-amber-500"
 };
 
@@ -103,6 +104,12 @@ export default function TaskCard({
           <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700">
             <Video className="h-3 w-3" />
             Call
+          </span>
+        )}
+        {task.sheets_url && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800">
+            <FileSpreadsheet className="h-3 w-3" />
+            Sheet
           </span>
         )}
         {task.is_bug && (

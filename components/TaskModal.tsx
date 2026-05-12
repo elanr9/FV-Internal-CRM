@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { format, formatDistanceToNow, parseISO } from "date-fns";
-import { X, Trash2, Upload, Loader2, Send, Image as ImageIcon, ExternalLink } from "lucide-react";
+import { addDays, format, formatDistanceToNow, parseISO, startOfDay } from "date-fns";
+import { X, Trash2, Upload, Loader2, Send, ExternalLink } from "lucide-react";
 import {
   DIFFICULTIES,
   DIFFICULTY_LABEL,
@@ -21,11 +22,10 @@ import {
   type Workflow
 } from "@/lib/types";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { canEditEngineeringBoard } from "@/lib/engineering-board";
 import Avatar from "./Avatar";
 
 const DATE_YEAR = "2026";
-const MIN_DATE = `${DATE_YEAR}-01-01`;
-const MAX_DATE = `${DATE_YEAR}-12-31`;
 
 type Props =
   | {
@@ -56,18 +56,21 @@ export default function TaskModal(props: Props) {
   const supabase = getSupabaseBrowser();
   const isEdit = props.mode === "edit";
   const initial = isEdit ? props.task : null;
+  const engineeringViewOnly =
+    isEdit && Boolean(initial?.workflow === "engineering" && !canEditEngineeringBoard(props.me));
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [workflow, setWorkflow] = useState<Workflow>(
     initial?.workflow ??
       props.defaultWorkflow ??
-      (props.me.role === "admin" ? "engineering" : "growth")
+      (canEditEngineeringBoard(props.me) ? "engineering" : "growth")
   );
   const [status, setStatus] = useState<Status>(initial?.status ?? props.defaultStatus ?? "todo");
   const [difficulty, setDifficulty] = useState<Difficulty>(initial?.difficulty ?? "medium");
   const [dueDate, setDueDate] = useState<string>(dateInCurrentYear(initial?.due_date ?? props.defaultDueDate ?? ""));
   const [callUrl, setCallUrl] = useState(initial?.call_url ?? "");
+  const [sheetsUrl, setSheetsUrl] = useState(initial?.sheets_url ?? "");
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
     initial
       ? (initial.assignee_ids ?? []).length > 0
@@ -90,6 +93,11 @@ export default function TaskModal(props: Props) {
   const [postingComment, setPostingComment] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const isFeatureIdea = workflow === "feature_ideas";
+
+  const upcomingWeekDays = useMemo(() => {
+    const start = startOfDay(new Date());
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  }, []);
 
   useEffect(() => {
     if (!isEdit || !initial) return;
@@ -123,6 +131,7 @@ export default function TaskModal(props: Props) {
   }, [props]);
 
   async function save() {
+    if (engineeringViewOnly) return;
     if (!title.trim()) {
       toast.error(isFeatureIdea ? "Give the idea a title." : "Give the task a title.");
       return;
@@ -140,7 +149,8 @@ export default function TaskModal(props: Props) {
       status,
       difficulty,
       due_date: dueDate || null,
-      call_url: normalizeCallUrl(callUrl),
+      call_url: normalizeHttpUrl(callUrl),
+      sheets_url: normalizeHttpUrl(sheetsUrl),
       assigned_to: assigneeIds[0] ?? null,
       assignee_ids: assigneeIds,
       assignee_statuses: nextAssigneeStatuses,
@@ -200,7 +210,7 @@ export default function TaskModal(props: Props) {
   }
 
   async function remove() {
-    if (!isEdit || !initial) return;
+    if (!isEdit || !initial || engineeringViewOnly) return;
     if (!confirm("Delete this task forever?")) return;
     setBusy(true);
     const { error } = await supabase.from("tasks").delete().eq("id", initial.id);
@@ -212,7 +222,7 @@ export default function TaskModal(props: Props) {
   }
 
   async function uploadFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || engineeringViewOnly) return;
     setUploading(true);
     const next: string[] = [];
     for (const file of Array.from(files)) {
@@ -234,7 +244,7 @@ export default function TaskModal(props: Props) {
   }
 
   async function postComment() {
-    if (!isEdit || !initial || !newComment.trim()) return;
+    if (!isEdit || !initial || !newComment.trim() || engineeringViewOnly) return;
     setPostingComment(true);
     const body = newComment.trim();
     const { data, error } = await supabase
@@ -268,19 +278,25 @@ export default function TaskModal(props: Props) {
         <div className="grid max-h-[calc(100vh-200px)] grid-cols-1 overflow-y-auto md:grid-cols-[1fr_280px]">
           <div className="space-y-5 px-6 py-5">
             <input
-              autoFocus
+              autoFocus={!engineeringViewOnly}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              readOnly={engineeringViewOnly}
               placeholder={isFeatureIdea ? "What should we build?" : "What needs to be done?"}
-              className="w-full bg-transparent text-2xl font-bold tracking-tight text-ink-900 placeholder-ink-300 outline-none"
+              className="w-full bg-transparent text-2xl font-bold tracking-tight text-ink-900 placeholder-ink-300 outline-none read-only:text-ink-700 read-only:pointer-events-none"
             />
 
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={isFeatureIdea ? "Add context, impact, links, or examples..." : "Add description, context, links, acceptance criteria..."}
+              readOnly={engineeringViewOnly}
+              placeholder={
+                isFeatureIdea
+                  ? "Add context, impact, links, or examples..."
+                  : "Add description, context, links, acceptance criteria..."
+              }
               rows={5}
-              className="input min-h-[120px] resize-y"
+              className="input min-h-[120px] resize-y read-only:pointer-events-none"
             />
 
             <div>
@@ -289,18 +305,42 @@ export default function TaskModal(props: Props) {
                 type="url"
                 value={callUrl}
                 onChange={(e) => setCallUrl(e.target.value)}
+                readOnly={engineeringViewOnly}
                 placeholder="Google Calendar or Zoom link"
-                className="input"
+                className="input read-only:pointer-events-none"
               />
-              {normalizeCallUrl(callUrl) && (
+              {normalizeHttpUrl(callUrl) && (
                 <a
-                  href={normalizeCallUrl(callUrl) ?? undefined}
+                  href={normalizeHttpUrl(callUrl) ?? undefined}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
                 >
                   <ExternalLink className="h-3 w-3" />
                   Open call link
+                </a>
+              )}
+            </div>
+
+            <div>
+              <SectionLabel>Shared sheet</SectionLabel>
+              <input
+                type="url"
+                value={sheetsUrl}
+                onChange={(e) => setSheetsUrl(e.target.value)}
+                readOnly={engineeringViewOnly}
+                placeholder="Google Sheets link for the team"
+                className="input read-only:pointer-events-none"
+              />
+              {normalizeHttpUrl(sheetsUrl) && (
+                <a
+                  href={normalizeHttpUrl(sheetsUrl) ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Open sheet
                 </a>
               )}
             </div>
@@ -314,29 +354,35 @@ export default function TaskModal(props: Props) {
                     className="group relative aspect-square overflow-hidden rounded-xl border border-ink-100 bg-ink-50"
                   >
                     <img src={url} alt="attachment" className="h-full w-full object-cover" />
-                    <button
-                      onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
-                      className="absolute right-1 top-1 rounded-full bg-ink-900/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                    {!engineeringViewOnly && (
+                      <button
+                        onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute right-1 top-1 rounded-full bg-ink-900/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-ink-200 text-ink-400 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600"
-                >
-                  {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => uploadFiles(e.target.files)}
-                />
+                {!engineeringViewOnly && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-ink-200 text-ink-400 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600"
+                    >
+                      {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                    </button>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => uploadFiles(e.target.files)}
+                    />
+                  </>
+                )}
               </div>
             </div>
 
@@ -368,6 +414,7 @@ export default function TaskModal(props: Props) {
                       </div>
                     </div>
                   ))}
+                  {!engineeringViewOnly && (
                   <div className="flex gap-2">
                     <Avatar profile={props.me} size={30} />
                     <div className="flex flex-1 items-center gap-2">
@@ -392,6 +439,10 @@ export default function TaskModal(props: Props) {
                       </button>
                     </div>
                   </div>
+                  )}
+                  {engineeringViewOnly && (
+                    <p className="text-xs text-ink-400">Only engineering editors can add comments.</p>
+                  )}
                 </div>
               </div>
             )}
@@ -402,10 +453,14 @@ export default function TaskModal(props: Props) {
               <select
                 value={workflow}
                 onChange={(e) => setWorkflow(e.target.value as Workflow)}
-                className="input"
+                disabled={engineeringViewOnly}
+                className="input disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {WORKFLOWS.filter(
-                  (w) => w !== "engineering" || props.me.role === "admin" || workflow === "engineering"
+                  (w) =>
+                    w !== "engineering" ||
+                    canEditEngineeringBoard(props.me) ||
+                    workflow === "engineering"
                 ).map((w) => (
                   <option key={w} value={w}>
                     {WORKFLOW_LABEL[w]}
@@ -418,7 +473,8 @@ export default function TaskModal(props: Props) {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as Status)}
-                className="input"
+                disabled={engineeringViewOnly}
+                className="input disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
@@ -432,7 +488,8 @@ export default function TaskModal(props: Props) {
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                className="input"
+                disabled={engineeringViewOnly}
+                className="input disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {DIFFICULTIES.map((d) => (
                   <option key={d} value={d}>
@@ -448,13 +505,17 @@ export default function TaskModal(props: Props) {
                 {props.team.map((p) => (
                   <label
                     key={p.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
+                    className={clsx(
+                      "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink-700",
+                      engineeringViewOnly ? "cursor-default opacity-80" : "cursor-pointer hover:bg-ink-50"
+                    )}
                   >
                     <input
                       type="checkbox"
                       checked={assigneeIds.includes(p.id)}
                       onChange={() => toggleAssignee(p.id)}
-                      className="h-4 w-4 rounded border-ink-300 text-brand-600"
+                      disabled={engineeringViewOnly}
+                      className="h-4 w-4 rounded border-ink-300 text-brand-600 disabled:cursor-not-allowed"
                     />
                     <Avatar profile={p} size={24} />
                     <span className="truncate">{p.full_name ?? p.email}</span>
@@ -479,7 +540,7 @@ export default function TaskModal(props: Props) {
                         <span className="min-w-0 flex-1 truncate text-sm text-ink-700">
                           {profile?.full_name ?? profile?.email ?? "Teammate"}
                         </span>
-                        {props.me.id === id ? (
+                        {props.me.id === id && !engineeringViewOnly ? (
                           <select
                             value={currentStatus}
                             onChange={(e) => setAssigneeStatus(id, e.target.value as Status)}
@@ -503,16 +564,49 @@ export default function TaskModal(props: Props) {
               </div>
             )}
 
-            <Field label="Due date">
-              <input
-                type="date"
-                value={dueDate}
-                min={MIN_DATE}
-                max={MAX_DATE}
-                onChange={(e) => setDueDate(dateInCurrentYear(e.target.value))}
-                className="input"
-              />
-            </Field>
+            <div>
+              <SectionLabel>Due date</SectionLabel>
+              <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                {upcomingWeekDays.map((day) => {
+                  const value = dateInCurrentYear(format(day, "yyyy-MM-dd"));
+                  const selected = Boolean(dueDate && dueDate === value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={engineeringViewOnly}
+                      onClick={() => setDueDate(selected ? "" : value)}
+                      title={format(day, "EEEE, MMMM d")}
+                      className={clsx(
+                        "flex min-h-[3rem] flex-col items-center justify-center rounded-full border px-0.5 py-1 text-center transition sm:min-h-[3.25rem]",
+                        selected
+                          ? "border-brand-500 bg-brand-600 text-white shadow-sm"
+                          : "border-ink-200 bg-white text-ink-700 hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "text-[8px] font-bold uppercase leading-none sm:text-[9px]",
+                          selected ? "text-white/90" : "text-ink-400"
+                        )}
+                      >
+                        {format(day, "EEE")}
+                      </span>
+                      <span className="mt-0.5 text-sm font-bold leading-none sm:text-base">{format(day, "d")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {dueDate &&
+                !upcomingWeekDays.some(
+                  (d) => dateInCurrentYear(format(d, "yyyy-MM-dd")) === dueDate
+                ) &&
+                !engineeringViewOnly && (
+                  <p className="mt-2 text-[11px] text-ink-400">
+                    Due date is outside this week. Pick a day above or save to keep it.
+                  </p>
+                )}
+            </div>
 
             {isEdit && initial && (
               <div className="rounded-xl bg-white p-3 text-xs text-ink-500">
@@ -535,7 +629,7 @@ export default function TaskModal(props: Props) {
 
         <footer className="flex items-center justify-between border-t border-ink-100 bg-white px-6 py-3.5">
           <div>
-            {isEdit && (
+            {isEdit && !engineeringViewOnly && (
               <button onClick={remove} className="btn-ghost text-rose-600 hover:bg-rose-50">
                 <Trash2 className="h-4 w-4" />
                 Delete
@@ -544,12 +638,14 @@ export default function TaskModal(props: Props) {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={props.onClose} className="btn-secondary">
-              Cancel
+              {engineeringViewOnly ? "Close" : "Cancel"}
             </button>
-            <button onClick={save} disabled={busy} className="btn-primary">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {isEdit ? "Save changes" : "Create task"}
-            </button>
+            {!engineeringViewOnly && (
+              <button onClick={save} disabled={busy} className="btn-primary">
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {isEdit ? "Save changes" : "Create task"}
+              </button>
+            )}
           </div>
         </footer>
       </div>
@@ -581,7 +677,7 @@ function dateInCurrentYear(value: string) {
   return `${DATE_YEAR}-${month}-${day}`;
 }
 
-function normalizeCallUrl(value: string) {
+function normalizeHttpUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;

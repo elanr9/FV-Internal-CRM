@@ -19,6 +19,7 @@ const WORKFLOW_DOT: Record<Workflow, string> = {
   engineering: "bg-brand-500",
   growth: "bg-emerald-500",
   content: "bg-fuchsia-500",
+  trav: "bg-orange-500",
   feature_ideas: "bg-amber-500"
 };
 
