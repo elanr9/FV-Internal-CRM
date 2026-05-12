@@ -20,7 +20,7 @@ const TEAM_COLOR_BY_EMAIL: Record<string, (typeof PALETTE)[number]> = {
   "fabri@fieldvisionai.com": PALETTE[2],
   "tona@fieldvisionai.com": PALETTE[3],
   "sebas@fieldvisionai.com": PALETTE[4],
-  "isaac@fieldvisionai.com": PALETTE[5],
+  "iad32@cornell.edu": PALETTE[5],
   "lucho@fieldvisionai.com": PALETTE[6]
 };
 

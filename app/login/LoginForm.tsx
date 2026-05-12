@@ -8,6 +8,7 @@ import { getSupabaseBrowser } from "@/lib/supabase/client";
 const EMAIL_BY_FIRST_NAME: Record<string, string> = {
   elan: "founders@fieldvisionai.com",
   fabri: "fabri@fieldvisionai.com",
+  isaac: "iad32@cornell.edu",
   gaby: "gdiaz0618@uchicago.edu",
   tona: "tonasanchezboss@gmail.com",
   sebas: "sebasdlc704@gmail.com",

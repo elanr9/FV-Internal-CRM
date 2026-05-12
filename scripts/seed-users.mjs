@@ -36,7 +36,8 @@ const USERS = [
   { email: "gdiaz0618@uchicago.edu", full_name: "Gaby", aliases: ["gabe@fieldvisionai.com"] },
   { email: "tonasanchezboss@gmail.com", full_name: "Tona", aliases: ["tona@fieldvisionai.com"] },
   { email: "sebasdlc704@gmail.com", full_name: "Sebas", aliases: ["sebas@fieldvisionai.com"] },
-  { email: "danielguerrero0803@gmail.com", full_name: "Trav", aliases: [] }
+  { email: "danielguerrero0803@gmail.com", full_name: "Trav", aliases: [] },
+  { email: "iad32@cornell.edu", full_name: "Isaac", aliases: ["isaac@fieldvisionai.com"] }
 ];
 
 const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers({
