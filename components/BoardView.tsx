@@ -3,6 +3,7 @@
 import { Code2, Compass, Lightbulb, Search, Sparkles, Video } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+  boardSectionStatus,
   type Difficulty,
   type Profile,
   type Status,
@@ -72,7 +73,7 @@ export default function BoardView({
     return STATUSES.map((status) => ({
       status,
       label: STATUS_LABEL[status],
-      tasks: filtered.filter((t) => t.status === status)
+      tasks: filtered.filter((t) => boardSectionStatus(t) === status)
     }));
   }, [filtered]);
 
@@ -139,7 +140,7 @@ export default function BoardView({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+      <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
         <div className="mx-auto max-w-[1400px] space-y-6 md:space-y-8">
           {isIdeaList ? (
             <TaskTable

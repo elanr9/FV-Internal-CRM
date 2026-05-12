@@ -61,7 +61,7 @@ export default function MyTasksView({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+      <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
         <div className="mx-auto max-w-[1400px] space-y-8">
           {groups.length === 0 && (
             <div className="card flex items-center justify-center p-12 text-sm text-ink-400">

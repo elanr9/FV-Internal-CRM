@@ -52,7 +52,7 @@ export default function BugsView({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+      <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
         <div className="mx-auto max-w-[1400px] space-y-8">
           <section>
             <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-ink-500">

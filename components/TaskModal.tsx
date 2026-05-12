@@ -13,6 +13,7 @@ import {
   STATUS_LABEL,
   WORKFLOWS,
   WORKFLOW_LABEL,
+  bottleneckAssigneeStatus,
   type AssigneeStatuses,
   type Difficulty,
   type Profile,
@@ -142,11 +143,14 @@ export default function TaskModal(props: Props) {
       assigneeIds.map((id) => [id, assigneeStatuses[id] ?? status])
     ) as AssigneeStatuses;
 
+    const rolledUpStatus =
+      assigneeIds.length === 0 ? status : bottleneckAssigneeStatus(assigneeIds, nextAssigneeStatuses, status);
+
     const payload = {
       title: title.trim(),
       description: description.trim() || null,
       workflow,
-      status,
+      status: rolledUpStatus,
       difficulty,
       due_date: dueDate || null,
       call_url: normalizeHttpUrl(callUrl),

@@ -9,6 +9,8 @@ import {
   WORKFLOW_LABEL,
   DIFFICULTIES,
   DIFFICULTY_LABEL,
+  boardSectionStatus,
+  taskStatusAfterAssigneePatch,
   type Difficulty,
   type Profile,
   type Status,
@@ -86,8 +88,8 @@ export default function TaskTable({ tasks, team, me, workflow, defaultStatus = "
         )}
       </div>
 
-      <div className="hidden overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card md:block">
-        <table className="w-full border-collapse text-sm">
+      <div className="hidden overflow-x-auto rounded-2xl border border-ink-100 bg-white shadow-card md:block">
+        <table className="w-full min-w-[56rem] border-collapse text-sm">
           <thead>
             <tr className="bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
               <th className="w-1 border-b border-ink-100 px-4 py-3" />
@@ -299,11 +301,13 @@ function TaskRow({
   }
 
   function patchAssigneeStatus(profileId: string, status: Status) {
+    const nextAssigneeStatuses = {
+      ...(task.assignee_statuses ?? {}),
+      [profileId]: status
+    };
     patch({
-      assignee_statuses: {
-        ...(task.assignee_statuses ?? {}),
-        [profileId]: status
-      }
+      assignee_statuses: nextAssigneeStatuses,
+      status: taskStatusAfterAssigneePatch(task, nextAssigneeStatuses)
     });
   }
 
@@ -369,7 +373,7 @@ function TaskRow({
       )}
     >
       <td className="px-1">
-        <StatusPill status={task.status} compact />
+        <StatusPill status={boardSectionStatus(task)} compact />
       </td>
       <td className="max-w-[480px] px-4 py-3">
         <button onClick={onOpen} className="flex w-full items-center gap-2.5 text-left">

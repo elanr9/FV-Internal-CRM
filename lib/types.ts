@@ -68,6 +68,54 @@ export const STATUS_LABEL: Record<Status, string> = {
 
 export const STATUSES: Status[] = ["backlog", "todo", "in_progress", "in_review", "done"];
 
+const STATUS_ORDER: Record<Status, number> = {
+  backlog: 0,
+  todo: 1,
+  in_progress: 2,
+  in_review: 3,
+  done: 4
+};
+
+function bottleneckStatusValues(statuses: Status[]): Status {
+  return statuses.reduce((min, s) => (STATUS_ORDER[s] < STATUS_ORDER[min] ? s : min));
+}
+
+export function taskAssigneeIds(task: Pick<Task, "assignee_ids" | "assigned_to">): string[] {
+  if ((task.assignee_ids ?? []).length > 0) return task.assignee_ids;
+  if (task.assigned_to) return [task.assigned_to];
+  return [];
+}
+
+/** Column grouping: same rule as per assignee status cells (bottleneck when several people). */
+export function boardSectionStatus(task: TaskWithPeople): Status {
+  const ids = taskAssigneeIds(task);
+  if (ids.length === 0) return task.status;
+  const statuses = ids.map((id) => task.assignee_statuses?.[id] ?? task.status);
+  return bottleneckStatusValues(statuses);
+}
+
+export function bottleneckAssigneeStatus(
+  assigneeIds: string[],
+  assigneeStatuses: AssigneeStatuses,
+  fallbackStatus: Status
+): Status {
+  if (assigneeIds.length === 0) return fallbackStatus;
+  const statuses = assigneeIds.map((id) => assigneeStatuses[id] ?? fallbackStatus);
+  return bottleneckStatusValues(statuses);
+}
+
+export function taskStatusAfterAssigneePatch(
+  task: Pick<Task, "status" | "assignee_ids" | "assigned_to" | "assignee_statuses">,
+  nextAssigneeStatuses: AssigneeStatuses
+): Status {
+  const ids = taskAssigneeIds(task);
+  if (ids.length === 0) return task.status;
+  const statuses = ids.map(
+    (id) => nextAssigneeStatuses[id] ?? task.assignee_statuses?.[id] ?? task.status
+  );
+  return bottleneckStatusValues(statuses);
+}
+
 export type DailyNote = {
   user_id: string;
   date: string;

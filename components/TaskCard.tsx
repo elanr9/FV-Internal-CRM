@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { format, isPast, isToday, parseISO } from "date-fns";
 import { Calendar, FileSpreadsheet, Paperclip, Video } from "lucide-react";
-import type { Status, TaskWithPeople, Workflow } from "@/lib/types";
+import { boardSectionStatus, type Status, type TaskWithPeople, type Workflow } from "@/lib/types";
 import Avatar from "./Avatar";
 
 const WORKFLOW_DOT: Record<Workflow, string> = {
@@ -41,7 +41,9 @@ export default function TaskCard({
   hideWorkflowDot?: boolean;
   onClick: () => void;
 }) {
-  const visibleStatus = profileId ? task.assignee_statuses?.[profileId] ?? task.status : task.status;
+  const visibleStatus = profileId
+    ? task.assignee_statuses?.[profileId] ?? task.status
+    : boardSectionStatus(task);
   const due = task.due_date ? parseISO(task.due_date) : null;
   const overdue = due ? isPast(due) && !isToday(due) && visibleStatus !== "done" : false;
   const assignees = (task.assignees ?? []).length > 0 ? task.assignees : task.assignee ? [task.assignee] : [];
