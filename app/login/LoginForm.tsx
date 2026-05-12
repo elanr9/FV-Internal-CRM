@@ -10,6 +10,7 @@ const EMAIL_BY_FIRST_NAME: Record<string, string> = {
   fabri: "fabri@fieldvisionai.com",
   isaac: "iad32@cornell.edu",
   gaby: "gdiaz0618@uchicago.edu",
+  gabe: "gdiaz0618@uchicago.edu",
   tona: "tonasanchezboss@gmail.com",
   sebas: "sebasdlc704@gmail.com",
   trav: "danielguerrero0803@gmail.com"
