@@ -24,7 +24,8 @@ const TEAM_ACCOUNTS: Record<string, TeamAccount> = {
   gaby: { email: "gdiaz0618@uchicago.edu", fullName: "Gaby", aliases: ["gabe@fieldvisionai.com"] },
   gabe: { email: "gdiaz0618@uchicago.edu", fullName: "Gaby", aliases: ["gabe@fieldvisionai.com"] },
   trav: { email: "danielguerrero0803@gmail.com", fullName: "Trav", aliases: [] },
-  tona: { email: "tonasanchezboss@gmail.com", fullName: "Tona", aliases: ["tona@fieldvisionai.com"] }
+  tona: { email: "tonasanchezboss@gmail.com", fullName: "Tona", aliases: ["tona@fieldvisionai.com"] },
+  victor: { email: "victormsaade@gmail.com", fullName: "Victor", aliases: [] }
 };
 
 export async function POST(req: Request) {

@@ -91,7 +91,7 @@ export default function LoginForm() {
         {loading ? "Signing in..." : "Create account or sign in"}
       </button>
       <p className="text-center text-xs text-ink-400">
-        Use tona, fabri, isaac, sebas, lucho, gaby, trav, or elan.
+        Use your team username, like victor or sebas.
       </p>
     </form>
   );
